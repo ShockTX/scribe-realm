@@ -1,4 +1,6 @@
 import { useState } from "react";
+import type { Character } from "../model/character";
+import { armorClass, maxHp } from "../rules/derive";
 import {
   LOCATIONS,
   TOWN_MAP_ART,
@@ -99,10 +101,23 @@ function Interior({ loc, onLeave }: { loc: TownLocation; onLeave: () => void }) 
   );
 }
 
-export function TownView() {
+export function TownView({ character }: { character?: Character }) {
   const [where, setWhere] = useState<string | null>(null);
   const loc = where ? locationById(where) : undefined;
 
-  if (loc) return <Interior loc={loc} onLeave={() => setWhere(null)} />;
-  return <TownMap onEnter={setWhere} />;
+  return (
+    <>
+      {character && (
+        <div className="purse">
+          <strong>{character.name}</strong>
+          <span>HP {character.currentHp || maxHp(character).value}</span>
+          <span>AC {armorClass(character).value}</span>
+          <span>{character.coin.gp} gp</span>
+        </div>
+      )}
+      {loc
+        ? <Interior loc={loc} onLeave={() => setWhere(null)} />
+        : <TownMap onEnter={setWhere} />}
+    </>
+  );
 }

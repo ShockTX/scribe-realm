@@ -100,7 +100,7 @@ export const LOCATIONS: TownLocation[] = [
     keeper: "Mirren Vask, landlord",
     description:
       "The long room runs the width of the building and smells of wet wool and frying onions. Every table is taken. The talk drops by a half when you come in, then picks up again, which is as close to a welcome as this town gives strangers.",
-    art: null,
+    art: "/art/town/tavern.jpg",
     services: [
       { kind: "rest", label: "Take a room for the night" },
       { kind: "quests", label: "Listen to the room" },
@@ -115,7 +115,7 @@ export const LOCATIONS: TownLocation[] = [
     keeper: "Sister Calloway",
     description:
       "A round hall, open to the weather on the seaward side, built over the place where the old town went under. Water stands ankle-deep across the floor at high tide and nobody has ever tried to drain it. Candles float in it, in their hundreds.",
-    art: null,
+    art: "/art/town/temple.jpg",
     services: [
       { kind: "heal", label: "Ask for tending" },
       { kind: "quests", label: "Speak with Sister Calloway" },
@@ -129,7 +129,7 @@ export const LOCATIONS: TownLocation[] = [
     keeper: "Clerk Ansel Pyne",
     description:
       "A narrow hall with a board the length of one wall, and every inch of it papered over in notices, some of them years deep. The clerk keeps a ledger of who took what work and who came back. He will want your name in it before he will let you read anything.",
-    art: null,
+    art: "/art/town/guildhall.jpg",
     services: [
       { kind: "quests", label: "Read the board" },
       { kind: "train", label: "Ask about the ledger" },
@@ -143,7 +143,7 @@ export const LOCATIONS: TownLocation[] = [
     keeper: "Greel, apothecary",
     description:
       "Low ceiling, bundled herbs hanging close enough to brush your head, and a pot on the boil that nobody is watching. Greel sells three kinds of thing here and is careful to write down which is which, because two of them will kill you.",
-    art: null,
+    art: "/art/town/apothecary.jpg",
     services: [
       { kind: "buy", label: "Buy remedies" },
       { kind: "heal", label: "Have a wound seen to" },

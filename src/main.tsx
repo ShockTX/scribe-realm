@@ -1,12 +1,13 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { TownView } from "./town/Town";
+import { App } from "./App";
 import "./town/town.css";
+import "./creator/creator.css";
 
 const el = document.getElementById("root");
 if (!el) throw new Error("no #root");
 createRoot(el).render(
   <React.StrictMode>
-    <TownView />
+    <App />
   </React.StrictMode>,
 );
