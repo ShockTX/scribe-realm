@@ -82,6 +82,14 @@ export interface Character {
   inspiration: boolean;
   attacks: AttackRow[];
 
+  // --- WORLD (the town keeps these) ---
+  /** shop item ids the character is carrying, with duplicates allowed */
+  pack: string[];
+  /** in-game day, advanced by sleeping at the inn */
+  day: number;
+  /** companion ids hired at the Salted Gull */
+  companions: string[];
+
   // --- CHOSEN (constrained by the rules) ---
   classes: ClassEntry[];
   /** SRD skill indexes, e.g. "arcana". Legality checked against class+background. */
@@ -133,6 +141,9 @@ export function emptyCharacter(id = crypto.randomUUID()): Character {
     deathSaveFailures: 0,
     inspiration: false,
     attacks: [],
+    pack: [],
+    day: 1,
+    companions: [],
     classes: [],
     skillProficiencies: [],
     expertise: [],

@@ -6,9 +6,15 @@ import {
   TOWN_MAP_ART,
   TOWN_NAME,
   locationById,
-  type Service,
   type TownLocation,
 } from "./locations";
+import { stockFor, itemById, sellPrice, type ShopItem } from "./shops";
+import {
+  ROOM_PRICE,
+  MEAL_PRICE,
+  companionOfTheDay,
+  rumourOfTheDay,
+} from "./inn";
 
 /** The map, with every door on it clickable. */
 function TownMap({ onEnter }: { onEnter: (id: string) => void }) {
@@ -44,31 +50,236 @@ function TownMap({ onEnter }: { onEnter: (id: string) => void }) {
           </button>
         ))}
       </div>
-
-      <ol className="town__index">
-        {LOCATIONS.map((loc) => (
-          <li key={loc.id}>
-            <button className="link" onClick={() => onEnter(loc.id)}>
-              {loc.name}
-            </button>
-            <span className="town__trade">{loc.trade}</span>
-          </li>
-        ))}
-      </ol>
     </div>
   );
 }
 
-function ServiceButton({ service }: { service: Service }) {
+function Counter({
+  stock,
+  character,
+  onBuy,
+  onSell,
+}: {
+  stock: ShopItem[];
+  character: Character;
+  onBuy: (item: ShopItem) => void;
+  onSell: (itemId: string) => void;
+}) {
+  const [tab, setTab] = useState<"buy" | "sell">("buy");
+
+  // The pack, folded into counts so five torches are one row.
+  const counts = new Map<string, number>();
+  for (const id of character.pack) counts.set(id, (counts.get(id) ?? 0) + 1);
+
   return (
-    <button className="service" data-kind={service.kind}>
-      {service.label}
-    </button>
+    <div className="counter">
+      <div className="counter__tabs">
+        <button
+          className={tab === "buy" ? "tab tab--on" : "tab"}
+          onClick={() => setTab("buy")}
+        >
+          On the shelves
+        </button>
+        <button
+          className={tab === "sell" ? "tab tab--on" : "tab"}
+          onClick={() => setTab("sell")}
+        >
+          Sell from your pack
+        </button>
+      </div>
+
+      {tab === "buy" ? (
+        <ul className="wares">
+          {stock.map((item) => {
+            const afford = character.coin.gp >= item.price;
+            return (
+              <li key={item.id} className={afford ? "ware" : "ware ware--dear"}>
+                <div className="ware__text">
+                  <strong>{item.name}</strong>
+                  <span className="ware__note">{item.note}</span>
+                </div>
+                <button
+                  className="ware__buy"
+                  disabled={!afford}
+                  onClick={() => onBuy(item)}
+                >
+                  {afford ? `${item.price} gp` : `${item.price} gp — too dear`}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : counts.size === 0 ? (
+        <p className="counter__empty">Your pack is empty.</p>
+      ) : (
+        <ul className="wares">
+          {[...counts.entries()].map(([id, n]) => {
+            const item = itemById(id);
+            const name = item ? item.name : id;
+            const price = item ? sellPrice(item.price) : 1;
+            return (
+              <li key={id} className="ware">
+                <div className="ware__text">
+                  <strong>
+                    {name}
+                    {n > 1 ? ` ×${n}` : ""}
+                  </strong>
+                  <span className="ware__note">Half of what it sold for.</span>
+                </div>
+                <button className="ware__buy" onClick={() => onSell(id)}>
+                  Sell for {price} gp
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function InnCounter({
+  character,
+  onRest,
+  onHire,
+  onMeal,
+}: {
+  character: Character;
+  onRest: () => void;
+  onHire: (fee: number, id: string, name: string) => void;
+  onMeal: () => void;
+}) {
+  const companion = companionOfTheDay(character.day, character);
+  const hired = companion ? character.companions.includes(companion.id) : false;
+  const hp = character.currentHp || maxHp(character).value;
+  const full = hp >= maxHp(character).value;
+
+  return (
+    <div className="counter">
+      <div className="inn">
+        <section className="inn__block">
+          <h3>A room for the night</h3>
+          <p className="ware__note">{rumourOfTheDay(character.day)}</p>
+          <button
+            className="ware__buy"
+            disabled={character.coin.gp < ROOM_PRICE}
+            onClick={onRest}
+          >
+            {full
+              ? `Sleep anyway — ${ROOM_PRICE} gp`
+              : `Take a room — ${ROOM_PRICE} gp`}
+          </button>
+        </section>
+
+        <section className="inn__block">
+          <h3>A hot meal</h3>
+          <p className="ware__note">Onions, fish, and bread that fights back.</p>
+          <button
+            className="ware__buy"
+            disabled={character.coin.gp < MEAL_PRICE}
+            onClick={onMeal}
+          >
+            Eat — {MEAL_PRICE} gp
+          </button>
+        </section>
+
+        <section className="inn__block">
+          <h3>At the far table</h3>
+          {companion ? (
+            <>
+              <p>
+                <strong>{companion.name}</strong>, {companion.role.toLowerCase()}
+              </p>
+              <p className="ware__note">“{companion.line}”</p>
+              <button
+                className="ware__buy"
+                disabled={hired || character.coin.gp < companion.fee}
+                onClick={() => onHire(companion.fee, companion.id, companion.name)}
+              >
+                {hired
+                  ? "Already with you"
+                  : `Buy them in — ${companion.fee} gp`}
+              </button>
+            </>
+          ) : (
+            <p className="ware__note">Nobody worth your coin tonight.</p>
+          )}
+        </section>
+      </div>
+    </div>
   );
 }
 
 /** Inside one building. */
-function Interior({ loc, onLeave }: { loc: TownLocation; onLeave: () => void }) {
+function Interior({
+  loc,
+  character,
+  setCharacter,
+  onLeave,
+}: {
+  loc: TownLocation;
+  character: Character;
+  setCharacter: (c: Character) => void;
+  onLeave: () => void;
+}) {
+  const [said, setSaid] = useState<string | null>(null);
+  const stock = stockFor(loc.id);
+  const isInn = loc.id === "tavern";
+
+  const buy = (item: ShopItem) => {
+    setCharacter({
+      ...character,
+      coin: { ...character.coin, gp: character.coin.gp - item.price },
+      pack: [...character.pack, item.id],
+    });
+    setSaid(`${item.name} — ${item.price} gp. It goes in the pack.`);
+  };
+
+  const sell = (itemId: string) => {
+    const item = itemById(itemId);
+    const price = item ? sellPrice(item.price) : 1;
+    const pack = [...character.pack];
+    pack.splice(pack.indexOf(itemId), 1);
+    setCharacter({
+      ...character,
+      coin: { ...character.coin, gp: character.coin.gp + price },
+      pack,
+    });
+    setSaid(`${item ? item.name : itemId} — ${price} gp, and no questions.`);
+  };
+
+  const rest = () => {
+    const full = maxHp(character).value;
+    setCharacter({
+      ...character,
+      coin: { ...character.coin, gp: character.coin.gp - ROOM_PRICE },
+      currentHp: full,
+      hitDiceRemaining: Math.max(1, Math.floor(character.classes[0]?.level ?? 1)),
+      day: character.day + 1,
+    });
+    setSaid("You sleep until the gulls start, and wake up whole. A new day.");
+  };
+
+  const meal = () => {
+    const full = maxHp(character).value;
+    const hp = character.currentHp || full;
+    setCharacter({
+      ...character,
+      coin: { ...character.coin, gp: character.coin.gp - MEAL_PRICE },
+      currentHp: Math.min(full, hp + 1),
+    });
+    setSaid("Hot food, and you feel a little more like yourself.");
+  };
+
+  const hire = (fee: number, id: string, name: string) => {
+    setCharacter({
+      ...character,
+      coin: { ...character.coin, gp: character.coin.gp - fee },
+      companions: [...character.companions, id],
+    });
+    setSaid(`${name} drains the cup, stands, and follows you out.`);
+  };
+
   return (
     <div className="town">
       <header className="town__head">
@@ -76,22 +287,38 @@ function Interior({ loc, onLeave }: { loc: TownLocation; onLeave: () => void }) 
         <p>{loc.keeper}</p>
       </header>
 
-      <div className={loc.art ? "scene" : "scene scene--unpainted"}>
-        {loc.art ? (
-          <img className="scene__art" src={loc.art} alt={`Inside ${loc.name}`} />
+      <div className="interior">
+        <div className={loc.art ? "scene" : "scene scene--unpainted"}>
+          {loc.art ? (
+            <img className="scene__art" src={loc.art} alt={`Inside ${loc.name}`} />
+          ) : (
+            <p className="scene__pending">This room has not been painted yet.</p>
+          )}
+          <p className="scene__text">{said ?? loc.description}</p>
+        </div>
+
+        {isInn ? (
+          <InnCounter
+            character={character}
+            onRest={rest}
+            onHire={hire}
+            onMeal={meal}
+          />
+        ) : stock.length > 0 ? (
+          <Counter
+            stock={stock}
+            character={character}
+            onBuy={buy}
+            onSell={sell}
+          />
         ) : (
-          <p className="scene__pending">
-            This room has not been painted yet.
-          </p>
+          <div className="counter">
+            <p className="counter__empty">
+              There is nothing for sale here — only talk, and not much of that
+              yet.
+            </p>
+          </div>
         )}
-      </div>
-
-      <p className="scene__text">{loc.description}</p>
-
-      <div className="services">
-        {loc.services.map((s) => (
-          <ServiceButton key={s.kind + s.label} service={s} />
-        ))}
       </div>
 
       <button className="link link--back" onClick={onLeave}>
@@ -101,23 +328,49 @@ function Interior({ loc, onLeave }: { loc: TownLocation; onLeave: () => void }) 
   );
 }
 
-export function TownView({ character }: { character?: Character }) {
+export function TownView({
+  character,
+  onChange,
+}: {
+  character: Character;
+  onChange?: (c: Character) => void;
+}) {
+  const [local, setLocal] = useState<Character>(character);
   const [where, setWhere] = useState<string | null>(null);
   const loc = where ? locationById(where) : undefined;
 
+  const update = (c: Character) => {
+    setLocal(c);
+    onChange?.(c);
+  };
+
+  const hp = local.currentHp || maxHp(local).value;
+
   return (
     <>
-      {character && (
-        <div className="purse">
-          <strong>{character.name}</strong>
-          <span>HP {character.currentHp || maxHp(character).value}</span>
-          <span>AC {armorClass(character).value}</span>
-          <span>{character.coin.gp} gp</span>
-        </div>
+      <div className="purse">
+        <strong>{local.name}</strong>
+        <span>Day {local.day}</span>
+        <span>
+          HP {hp}/{maxHp(local).value}
+        </span>
+        <span>AC {armorClass(local).value}</span>
+        <span>{local.coin.gp} gp</span>
+        <span>Pack {local.pack.length}</span>
+        {local.companions.length > 0 && (
+          <span>Party {local.companions.length + 1}</span>
+        )}
+      </div>
+      {loc ? (
+        <Interior
+          loc={loc}
+          character={local}
+          setCharacter={update}
+          onLeave={() => setWhere(null)}
+        />
+      ) : (
+        <TownMap onEnter={setWhere} />
       )}
-      {loc
-        ? <Interior loc={loc} onLeave={() => setWhere(null)} />
-        : <TownMap onEnter={setWhere} />}
     </>
   );
 }

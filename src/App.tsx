@@ -28,7 +28,7 @@ export function App() {
   };
 
   if (screen === "create") return <Creator onBind={bind} />;
-  if (screen === "town" && character) return <TownView character={character} />;
+  if (screen === "town" && character) return <TownView character={character} onChange={(c) => { localStorage.setItem(SAVE_KEY, JSON.stringify(c)); setCharacter(c); }} />;
 
   return (
     <div className="title">
