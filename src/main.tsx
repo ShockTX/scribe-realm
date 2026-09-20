@@ -4,6 +4,7 @@ import { App } from "./App";
 import "./town/town.css";
 import "./creator/creator.css";
 import "./game/party.css";
+import "./scene/scene.css";
 
 const el = document.getElementById("root");
 if (!el) throw new Error("no #root");
