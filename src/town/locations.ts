@@ -158,7 +158,7 @@ export const LOCATIONS: TownLocation[] = [
     keeper: "Harbourmaster Coll",
     description:
       "One room, one desk, and charts pinned over charts until the wall has gone soft with them. Coll knows every keel that has tied up here since the frost and precisely which of them he would not sail on.",
-    art: null,
+    art: "/art/town/harbormaster.jpg",
     services: [
       { kind: "quests", label: "Ask what has come in" },
       { kind: "travel", label: "Enquire about passage" },
@@ -172,7 +172,7 @@ export const LOCATIONS: TownLocation[] = [
     keeper: "whoever is shouting loudest",
     description:
       "Trestles and awnings jammed into the space between the warehouses, packed up and rebuilt twice a day around the tide. Nothing here has a fixed price and nothing here has any provenance worth asking about.",
-    art: null,
+    art: "/art/town/wharf-market.jpg",
     services: [
       { kind: "buy", label: "Wander the stalls" },
       { kind: "sell", label: "Find a buyer" },
@@ -186,7 +186,7 @@ export const LOCATIONS: TownLocation[] = [
     keeper: "the Tallow family, all of them",
     description:
       "Three sheds built into one another above the beach, where they cure, cut and stitch everything the town wears against a blade. The smell reaches the road. They are unbothered by this and will tell you so.",
-    art: null,
+    art: "/art/town/armorer.jpg",
     services: [
       { kind: "buy", label: "Be fitted for armour" },
       { kind: "sell", label: "Sell battered plate" },
@@ -200,7 +200,7 @@ export const LOCATIONS: TownLocation[] = [
     keeper: "Captain Idris Fenn",
     description:
       "She sits at the long pier with her sails furled and her deck swept, which in this harbour marks her out as either very well run or very recently bought. Fenn is aboard. Fenn is always aboard.",
-    art: null,
+    art: "/art/town/ship.jpg",
     services: [
       { kind: "travel", label: "Ask where she is bound" },
       { kind: "quests", label: "Speak with Captain Fenn" },
