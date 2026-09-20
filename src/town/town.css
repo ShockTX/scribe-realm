@@ -1,0 +1,205 @@
+:root {
+  --ink: #3b2a1d;
+  --ink-soft: #6b5342;
+  --parchment: #f3e7d0;
+  --parchment-deep: #e6d5b8;
+  --rule: #b79b74;
+  --gold: #a8762c;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  
+  background: #201a14;
+  color: var(--ink);
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+}
+
+.town {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+  background: var(--parchment);
+  min-height: 100vh;
+  box-shadow: 0 0 80px rgba(0, 0, 0, 0.6);
+}
+
+.town__head {
+  text-align: center;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.town__head h1 {
+  margin: 0;
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.town__head p {
+  margin: 0.35rem 0 0;
+  color: var(--ink-soft);
+  font-style: italic;
+  min-height: 1.4em;
+}
+
+/* ---- the map ---- */
+
+.map {
+  position: relative;
+  line-height: 0;
+  border: 1px solid var(--rule);
+  background: #1c2a33;
+}
+
+.map__art {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.map__spot {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.map__spot:hover,
+.map__spot:focus-visible {
+  background: rgba(255, 226, 160, 0.28);
+  border-color: rgba(255, 226, 160, 0.85);
+  outline: none;
+}
+
+.map__tag {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 4px);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  padding: 0.1rem 0.45rem;
+  background: var(--parchment);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.map__spot:hover .map__tag,
+.map__spot:focus-visible .map__tag {
+  opacity: 1;
+}
+
+/* ---- the list under the map ---- */
+
+.town__index {
+  list-style: none;
+  margin: 1.5rem 0 0;
+  padding: 0;
+  columns: 2;
+  column-gap: 2.5rem;
+}
+
+.town__index li {
+  break-inside: avoid;
+  padding: 0.3rem 0;
+  border-bottom: 1px dotted var(--rule);
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.town__trade {
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* ---- inside a building ---- */
+
+.scene {
+  border: 1px solid var(--rule);
+  background: #1c1720;
+  line-height: 0;
+}
+
+.scene__art {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.scene--unpainted {
+  line-height: 1.5;
+  background: var(--parchment-deep);
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.scene__pending {
+  margin: 0;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.scene__text {
+  margin: 1.1rem 0 1.4rem;
+  font-size: 1.05rem;
+  line-height: 1.65;
+  max-width: 62ch;
+}
+
+.services {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.service {
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 0.45rem 0.9rem;
+  color: var(--ink);
+  background: var(--parchment-deep);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.service:hover {
+  background: #f7efdd;
+  border-color: var(--gold);
+}
+
+.link {
+  font: inherit;
+  font-size: 1rem;
+  color: var(--ink);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 3px;
+}
+
+.link:hover { text-decoration-color: var(--gold); }
+
+.link--back {
+  display: inline-block;
+  margin-top: 2rem;
+  color: var(--ink-soft);
+}

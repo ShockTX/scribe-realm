@@ -1,0 +1,12 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch({ executablePath: '/usr/bin/chromium' });
+const ctx = await b.newContext({ httpCredentials: { username:'JMG', password:'Kestrel-Hollow-4127' } });
+const p = await ctx.newPage();
+const errs = []; p.on('pageerror', e => errs.push(String(e)));
+await p.goto('https://scribe.atxcuriosities.com/', { waitUntil:'networkidle' });
+await p.waitForTimeout(2000);
+console.log('TITLE:', await p.title());
+console.log('TEXT:', (await p.innerText('body')).slice(0,300).replace(/\n+/g,' | '));
+await p.screenshot({ path:'/tmp/live-realm.png' });
+console.log('ERRORS:', errs.length ? errs : 'none');
+await b.close();

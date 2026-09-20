@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scribe — D&amp;D Character Creator</title>
+<style>
+  :root{
+    --ink:#4a2f18; --ink2:#6b4a2a; --line:#7a5230; --line-soft:#b79268;
+    --parch:#f4ecd8; --parch2:#efe4c9; --panel:#fbf6e9; --accent:#7a5230;
+    --shadow:rgba(74,47,24,.18);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    font:400 15px/1.45 "Georgia","Times New Roman",serif;
+    color:var(--ink);
+    background:
+      radial-gradient(circle at 20% 10%, #f7f0dd, transparent 60%),
+      radial-gradient(circle at 90% 80%, #efe3c6, transparent 55%),
+      #f0e6cd;
+    padding:18px;
+  }
+  .wrap{max-width:1040px;margin:0 auto}
+  header.top{text-align:center;margin-bottom:14px}
+  header.top h1{
+    font-size:30px;letter-spacing:.06em;margin:0 0 2px;color:var(--ink);
+    text-shadow:1px 1px 0 #fff8e7;
+  }
+  header.top .sub{font-style:italic;color:var(--ink2);font-size:14px}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:12px 0 20px}
+  button{
+    font-family:inherit;font-size:14px;cursor:pointer;
+    background:linear-gradient(#fbf6e9,#eaddbf);
+    color:var(--ink);border:1.5px solid var(--line);border-radius:7px;
+    padding:8px 14px;box-shadow:0 1px 2px var(--shadow);transition:.12s;
+  }
+  button:hover{background:linear-gradient(#fff,#e5d5b2);transform:translateY(-1px)}
+  button.primary{background:linear-gradient(#8a5a2f,#6b4423);color:#fbf3df;border-color:#5a3818}
+  button.primary:hover{background:linear-gradient(#9a6636,#754a26)}
+  .sheet{
+    background:var(--parch);border:2.5px solid var(--line);border-radius:14px;
+    box-shadow:0 8px 30px var(--shadow), inset 0 0 60px rgba(122,82,48,.06);padding:20px;
+  }
+  .banner{
+    border:2px solid var(--line);border-radius:12px;
+    background:linear-gradient(#fbf6e9,#f1e6cd);padding:14px 16px;margin-bottom:16px;position:relative;
+  }
+  .banner .title-row{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+  .crest{
+    width:54px;height:54px;flex:none;border:2px solid var(--line);border-radius:50%;
+    display:grid;place-items:center;background:radial-gradient(#fbf6e9,#e6d3ae);
+    font-weight:bold;font-size:20px;color:var(--ink)
+  }
+  .banner .charname{flex:1}
+  .banner .charname input{font-size:22px;font-weight:bold}
+  .dd-badge{font-size:26px;font-weight:bold;letter-spacing:.04em;color:var(--ink);font-variant:small-caps}
+  .banner-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 18px}
+  @media(max-width:640px){.banner-grid{grid-template-columns:1fr 1fr}}
+  label.field{display:block;margin:0}
+  label.field .cap{display:block;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink2);margin-top:6px}
+  input,textarea,select{
+    width:100%;font-family:inherit;font-size:15px;color:var(--ink);
+    background:transparent;border:none;border-bottom:1.5px dotted var(--line-soft);
+    padding:3px 2px;outline:none;border-radius:0
+  }
+  input:focus,textarea:focus,select:focus{border-bottom-color:var(--accent);background:rgba(255,255,255,.4)}
+  textarea{resize:vertical;border:1.5px dotted var(--line-soft);border-radius:6px;padding:6px;min-height:56px}
+  .cols{display:grid;grid-template-columns:150px 1fr 260px;gap:16px}
+  @media(max-width:920px){.cols{grid-template-columns:1fr}}
+  .panel{border:2px solid var(--line);border-radius:12px;background:var(--panel);padding:12px;margin-bottom:14px}
+  .panel h3{
+    margin:0 0 10px;text-align:center;font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);
+    display:flex;align-items:center;justify-content:center;gap:8px
+  }
+  .panel h3::before,.panel h3::after{content:"";height:2px;flex:1;background:var(--line-soft);max-width:40px}
+  .ability{border:2px solid var(--line);border-radius:14px;background:var(--panel);text-align:center;padding:8px 6px 10px;margin-bottom:12px}
+  .ability .name{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink2)}
+  .ability .score input{text-align:center;font-size:26px;font-weight:bold;border-bottom:none;width:70px;margin:2px auto 0}
+  .ability .mod{
+    display:inline-block;min-width:44px;margin-top:4px;padding:2px 6px;
+    border:1.5px solid var(--line);border-radius:20px;background:#fbf6e9;font-weight:bold;font-size:15px
+  }
+  .combat-top{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+  @media(max-width:520px){.combat-top{grid-template-columns:1fr 1fr}}
+  input[readonly]{background:rgba(122,82,48,.06);cursor:default;color:var(--ink)}
+  .stat-box{border:2px solid var(--line);border-radius:12px;background:var(--panel);text-align:center;padding:8px 4px}
+  .stat-box .cap{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2)}
+  .stat-box input{text-align:center;font-size:22px;font-weight:bold;border-bottom:none}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .listrow{display:flex;align-items:center;gap:8px;padding:2px 0}
+  .listrow input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);flex:none}
+  .listrow .prof-in{width:42px;text-align:center;flex:none;font-weight:bold}
+  .listrow .lbl{flex:1;font-size:13.5px}
+  .listrow .abil{font-size:11px;color:var(--ink2)}
+  .death{display:flex;gap:18px;justify-content:center;margin-top:6px}
+  .death .grp{text-align:center}
+  .death .dots{display:flex;gap:5px;justify-content:center;margin-top:3px}
+  .death .dots input{width:15px;height:15px;accent-color:var(--accent)}
+  .money{display:grid;grid-template-columns:1fr;gap:6px}
+  .coin{display:flex;align-items:center;gap:8px}
+  .coin .c{width:34px;height:34px;flex:none;border:2px solid var(--line);border-radius:50%;display:grid;place-items:center;font-weight:bold;font-size:12px;background:#fbf6e9}
+  .coin input{border-bottom:1.5px dotted var(--line-soft)}
+  .attacks table{width:100%;border-collapse:collapse;font-size:13px}
+  .attacks th{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);text-align:left;padding:2px}
+  .attacks td{padding:1px 2px}
+  .attacks input{border-bottom:1px dotted var(--line-soft)}
+  .muted{color:var(--ink2);font-size:12px}
+  .savednote{text-align:center;color:var(--ink2);font-size:12px;min-height:16px;margin-top:8px}
+  @media print{
+    body{background:#fff;padding:0}
+    .toolbar,header.top .sub,.savednote{display:none}
+    .sheet{border:none;box-shadow:none}
+    button{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>⚔ Scribe — Character Creator</h1>
+    <div class="sub">Dungeons &amp; Dragons 5e · fill it in, it saves as you go</div>
+  </header>
+
+  <div class="toolbar">
+    <button class="primary" onclick="saveChar()">💾 Save</button>
+    <button onclick="window.print()">🖨 Print / PDF</button>
+    <button onclick="exportChar()">⬇ Export JSON</button>
+    <button onclick="document.getElementById('importfile').click()">⬆ Import JSON</button>
+    <button onclick="newChar()">✚ New</button>
+    <input type="file" id="importfile" accept="application/json" style="display:none" onchange="importChar(event)">
+  </div>
+
+  <form id="sheet" class="sheet" oninput="onEdit()">
+    <div class="banner">
+      <div class="title-row">
+        <div class="crest">H.P.</div>
+        <div class="charname">
+          <label class="field"><input data-k="name" placeholder="Character Name"><span class="cap">Character Name</span></label>
+        </div>
+        <div class="dd-badge">D&amp;D</div>
+      </div>
+      <div class="banner-grid">
+        <label class="field"><input data-k="classlevel" placeholder="—"><span class="cap">Class &amp; Level</span></label>
+        <label class="field"><input data-k="background" placeholder="—"><span class="cap">Background</span></label>
+        <label class="field"><input data-k="playername" placeholder="—"><span class="cap">Player Name</span></label>
+        <label class="field"><input data-k="race" placeholder="—"><span class="cap">Race</span></label>
+        <label class="field"><input data-k="alignment" placeholder="—"><span class="cap">Alignment</span></label>
+        <label class="field"><input data-k="xp" placeholder="—"><span class="cap">Experience Points</span></label>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div class="col-left">
+        <div id="abilities"></div>
+        <div class="panel">
+          <div class="listrow"><input type="checkbox" data-k="inspiration"><span class="lbl">Inspiration</span></div>
+          <div class="listrow"><input class="prof-in" data-k="level" placeholder="1" inputmode="numeric" oninput="recalcMods()"><span class="lbl">Level</span></div>
+          <div class="listrow"><input class="prof-in" data-k="profbonus" placeholder="+2" readonly title="auto from Level"><span class="lbl">Proficiency Bonus</span></div>
+        </div>
+      </div>
+
+      <div class="col-mid">
+        <div class="combat-top">
+          <div class="stat-box"><input data-k="ac" placeholder="10"><div class="cap">Armor Class</div></div>
+          <div class="stat-box"><input data-k="initiative" placeholder="+0" readonly title="auto: DEX mod"><div class="cap">Initiative</div></div>
+          <div class="stat-box"><input data-k="speed" placeholder="30 ft"><div class="cap">Speed</div></div>
+          <div class="stat-box"><input data-k="passiveperception" placeholder="10" readonly title="auto: 10 + Perception"><div class="cap">Passive Perception</div></div>
+        </div>
+
+        <div class="panel">
+          <h3>Hit Points</h3>
+          <div class="row2">
+            <label class="field"><input data-k="hpmax" placeholder="—"><span class="cap">Maximum</span></label>
+            <label class="field"><input data-k="hpcurrent" placeholder="—"><span class="cap">Current</span></label>
+          </div>
+          <label class="field"><input data-k="hptemp" placeholder="—"><span class="cap">Temporary</span></label>
+        </div>
+
+        <div class="row2">
+          <div class="panel">
+            <h3>Hit Dice</h3>
+            <label class="field"><input data-k="hitdice_total" placeholder="Total"><span class="cap">Total</span></label>
+            <label class="field"><input data-k="hitdice" placeholder="e.g. 1d10"><span class="cap">Dice</span></label>
+          </div>
+          <div class="panel">
+            <h3>Death Saves</h3>
+            <div class="death">
+              <div class="grp"><div class="muted">Successes</div>
+                <div class="dots"><input type="checkbox" data-k="ds_s1"><input type="checkbox" data-k="ds_s2"><input type="checkbox" data-k="ds_s3"></div>
+              </div>
+              <div class="grp"><div class="muted">Failures</div>
+                <div class="dots"><input type="checkbox" data-k="ds_f1"><input type="checkbox" data-k="ds_f2"><input type="checkbox" data-k="ds_f3"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel attacks">
+          <h3>Attacks &amp; Spellcasting</h3>
+          <table>
+            <thead><tr><th>Weapon</th><th>Atk Bonus</th><th>Damage / Type</th></tr></thead>
+            <tbody id="attackrows"></tbody>
+          </table>
+          <button type="button" style="margin-top:8px" onclick="addAttack()">+ Add Row</button>
+        </div>
+
+        <div class="panel">
+          <h3>Other Proficiencies &amp; Languages</h3>
+          <textarea data-k="proficiencies" placeholder="Armor, weapons, tools, languages…" style="min-height:90px"></textarea>
+        </div>
+      </div>
+
+      <div class="col-right">
+        <div class="panel">
+          <h3>Saving Throws</h3>
+          <div id="saves"></div>
+        </div>
+        <div class="panel">
+          <h3>Skills</h3>
+          <div id="skills"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cols" style="grid-template-columns:1fr 1fr 1fr">
+      <div>
+        <div class="panel"><h3>Personality Traits</h3><textarea data-k="traits"></textarea></div>
+        <div class="panel"><h3>Ideals</h3><textarea data-k="ideals"></textarea></div>
+        <div class="panel"><h3>Bonds</h3><textarea data-k="bonds"></textarea></div>
+        <div class="panel"><h3>Flaws</h3><textarea data-k="flaws"></textarea></div>
+      </div>
+      <div>
+        <div class="panel"><h3>Features &amp; Traits</h3><textarea data-k="features" style="min-height:320px"></textarea></div>
+      </div>
+      <div>
+        <div class="panel">
+          <h3>Equipment</h3>
+          <div class="money" style="margin-bottom:10px">
+            <div class="coin"><div class="c">CP</div><input data-k="cp" placeholder="0"></div>
+            <div class="coin"><div class="c">SP</div><input data-k="sp" placeholder="0"></div>
+            <div class="coin"><div class="c">EP</div><input data-k="ep" placeholder="0"></div>
+            <div class="coin"><div class="c">GP</div><input data-k="gp" placeholder="0"></div>
+            <div class="coin"><div class="c">PP</div><input data-k="pp" placeholder="0"></div>
+          </div>
+          <textarea data-k="equipment" style="min-height:200px" placeholder="Backpack, rations, rope…"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="savednote" id="savednote"></div>
+  </form>
+</div>
+
+<script>
+const ABILITIES = [
+  ["str","Strength"],["dex","Dexterity"],["con","Constitution"],
+  ["int","Intelligence"],["wis","Wisdom"],["cha","Charisma"]
+];
+const SAVES = ABILITIES;
+const SKILLS = [
+  ["acrobatics","Acrobatics","dex"],["animal","Animal Handling","wis"],["arcana","Arcana","int"],
+  ["athletics","Athletics","str"],["deception","Deception","cha"],["history","History","int"],
+  ["insight","Insight","wis"],["intimidation","Intimidation","cha"],["investigation","Investigation","int"],
+  ["medicine","Medicine","wis"],["nature","Nature","int"],["perception","Perception","wis"],
+  ["performance","Performance","cha"],["persuasion","Persuasion","cha"],["religion","Religion","int"],
+  ["sleight","Sleight of Hand","dex"],["stealth","Stealth","dex"],["survival","Survival","wis"]
+];
+const SAVE_ABIL={str:"str",dex:"dex",con:"con",int:"int",wis:"wis",cha:"cha"};
+function fmt(n){ return n>=0?"+"+n:""+n; }
+function profBonusFromLevel(lvl){ const n=parseInt(lvl,10); if(isNaN(n)||n<1) return 2; return Math.ceil(n/4)+1; }
+const KEY = "scribe.dnd.character.v1";
+
+const abBox = document.getElementById("abilities");
+ABILITIES.forEach(([k,label])=>{
+  const d=document.createElement("div");
+  d.className="ability";
+  d.innerHTML='<div class="name">'+label+'</div>'+
+    '<div class="score"><input data-k="ab_'+k+'" inputmode="numeric" placeholder="10" oninput="recalcMods()"></div>'+
+    '<div class="mod" id="mod_'+k+'">+0</div>';
+  abBox.appendChild(d);
+});
+
+const savesBox=document.getElementById("saves");
+SAVES.forEach(([k,label])=>{
+  const r=document.createElement("div");
+  r.className="listrow";
+  r.innerHTML='<input type="checkbox" data-k="save_prof_'+k+'" onchange="recalcMods()">'+
+    '<input class="prof-in" data-k="save_val_'+k+'" placeholder="+0" readonly title="auto-calculated">'+
+    '<span class="lbl">'+label+'</span>';
+  savesBox.appendChild(r);
+});
+
+const skillsBox=document.getElementById("skills");
+SKILLS.forEach(([k,label,abil])=>{
+  const r=document.createElement("div");
+  r.className="listrow";
+  r.innerHTML='<input type="checkbox" data-k="skill_prof_'+k+'" onchange="recalcMods()">'+
+    '<input class="prof-in" data-k="skill_val_'+k+'" placeholder="+0" readonly title="auto-calculated">'+
+    '<span class="lbl">'+label+' <span class="abil">('+abil.toUpperCase()+')</span></span>';
+  skillsBox.appendChild(r);
+});
+
+function addAttack(v){
+  v=v||{};
+  const tb=document.getElementById("attackrows");
+  const i=tb.children.length;
+  const tr=document.createElement("tr");
+  tr.innerHTML='<td><input data-k="atk_name_'+i+'"></td>'+
+    '<td><input data-k="atk_bonus_'+i+'"></td>'+
+    '<td><input data-k="atk_dmg_'+i+'"></td>';
+  tb.appendChild(tr);
+}
+for(let i=0;i<3;i++) addAttack();
+
+function mod(score){
+  const n=parseInt(score,10);
+  if(isNaN(n)) return null;
+  return Math.floor((n-10)/2);
+}
+function recalcMods(){
+  const mods={};
+  ABILITIES.forEach(([k])=>{
+    const el=document.querySelector('[data-k="ab_'+k+'"]');
+    const m=mod(el.value);
+    mods[k]=(m===null?0:m);
+    document.getElementById("mod_"+k).textContent = fmt(mods[k]);
+  });
+  // Proficiency bonus: derive from level if present, else keep manual entry
+  const lvlEl=document.querySelector('[data-k="level"]');
+  const pbEl=document.querySelector('[data-k="profbonus"]');
+  let pb;
+  if(lvlEl && lvlEl.value.trim()!==""){ pb=profBonusFromLevel(lvlEl.value); if(pbEl) pbEl.value=fmt(pb); }
+  else { pb=parseInt((pbEl&&pbEl.value)||"",10); if(isNaN(pb)) pb=2; }
+  // Saving throws = ability mod (+ prof bonus if proficient)
+  SAVES.forEach(([k])=>{
+    const prof=document.querySelector('[data-k="save_prof_'+k+'"]').checked;
+    const val=mods[k]+(prof?pb:0);
+    document.querySelector('[data-k="save_val_'+k+'"]').value=fmt(val);
+  });
+  // Skills = governing ability mod (+ prof bonus if proficient)
+  SKILLS.forEach(([k,label,abil])=>{
+    const prof=document.querySelector('[data-k="skill_prof_'+k+'"]').checked;
+    const val=mods[abil]+(prof?pb:0);
+    document.querySelector('[data-k="skill_val_'+k+'"]').value=fmt(val);
+  });
+  // Initiative = DEX mod
+  const initEl=document.querySelector('[data-k="initiative"]');
+  if(initEl) initEl.value=fmt(mods.dex);
+  // Passive Perception = 10 + Perception skill (WIS mod + prof if proficient)
+  const ppEl=document.querySelector('[data-k="passiveperception"]');
+  if(ppEl){
+    const percProf=document.querySelector('[data-k="skill_prof_perception"]').checked;
+    ppEl.value=10+mods.wis+(percProf?pb:0);
+  }
+}
+
+function collect(){
+  const data={};
+  document.querySelectorAll("[data-k]").forEach(el=>{
+    data[el.dataset.k]= el.type==="checkbox"? el.checked : el.value;
+  });
+  return data;
+}
+function apply(data){
+  document.querySelectorAll("[data-k]").forEach(el=>{
+    if(!(el.dataset.k in data)) return;
+    if(el.type==="checkbox") el.checked=!!data[el.dataset.k];
+    else el.value=data[el.dataset.k];
+  });
+  recalcMods();
+}
+let saveTimer=null;
+function onEdit(){ clearTimeout(saveTimer); saveTimer=setTimeout(()=>saveChar(true),600); }
+function saveChar(auto){
+  try{ localStorage.setItem(KEY, JSON.stringify(collect())); note(auto?"Auto-saved ✓":"Saved ✓"); }
+  catch(e){ note("Save failed: "+e.message); }
+}
+function load(){
+  try{ const raw=localStorage.getItem(KEY); if(raw) apply(JSON.parse(raw)); }catch(e){}
+  recalcMods();
+}
+function newChar(){
+  if(!confirm("Start a new character? This clears the current one (export first if you want a copy).")) return;
+  localStorage.removeItem(KEY);
+  document.querySelectorAll("[data-k]").forEach(el=>{ if(el.type==="checkbox") el.checked=false; else el.value=""; });
+  recalcMods(); note("New character");
+}
+function exportChar(){
+  const blob=new Blob([JSON.stringify(collect(),null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  const nm=(collect().name||"character").replace(/[^a-z0-9]+/gi,"_");
+  a.href=URL.createObjectURL(blob); a.download=nm+".json"; a.click();
+  URL.revokeObjectURL(a.href);
+}
+function importChar(ev){
+  const f=ev.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{ apply(JSON.parse(r.result)); saveChar(); note("Imported ✓"); }catch(e){ note("Import failed: "+e.message);} };
+  r.readAsText(f); ev.target.value="";
+}
+function note(t){ const n=document.getElementById("savednote"); n.textContent=t; clearTimeout(note._t); note._t=setTimeout(()=>n.textContent="",2500); }
+
+load();
+</script>
+</body>
+</html>

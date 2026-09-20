@@ -1,0 +1,1 @@
+{"root":["./src/main.tsx","./src/model/character.ts","./src/rules/srd.ts","./src/town/Town.tsx","./src/town/locations.ts","./src/town/__tests__/locations.test.ts","./src/types/json.d.ts"],"version":"5.9.3"}
