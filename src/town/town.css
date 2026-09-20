@@ -276,3 +276,145 @@ body {
 .inn__block { margin-bottom: 1.2rem; }
 .inn__block h3 { margin: 0 0 .3rem; font-size: 1rem; }
 .inn__block p { margin: 0 0 .5rem; }
+
+/* ===== layout: fit the window, scroll only inside panels ===== */
+
+html, body, #root { height: 100%; }
+
+body { overflow: hidden; }
+
+.town {
+  min-height: 0;
+  height: calc(100vh - 2.2rem);   /* the purse bar sits above */
+  max-height: calc(100vh - 2.2rem);
+  padding: 1rem 1.25rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.town__head { flex: none; padding-bottom: .5rem; margin-bottom: .75rem; }
+.town__head h1 { font-size: clamp(1.3rem, 2.6vw, 1.9rem); }
+
+/* --- map screen: art left, destination list right, both fitting --- */
+
+.town--map { display: flex; }
+
+.town--map .map {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  line-height: 0;
+}
+
+.town--map .map__art {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  object-fit: contain;
+}
+
+.town--map .town__index {
+  flex: none;
+  columns: 3;
+  column-gap: 1.6rem;
+  margin: .8rem 0 0;
+  max-height: 9rem;
+  overflow-y: auto;
+  font-size: .9rem;
+}
+
+.town--map .town__index li { padding: .18rem 0; }
+.town--map .town__trade { font-size: .78rem; }
+
+@media (max-width: 900px) {
+  .town--map .town__index { columns: 2; }
+}
+
+/* --- inside a building --- */
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.stage .scene {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.stage .scene__art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* the description now sits on parchment, not on the dark art */
+.scene__text {
+  flex: none;
+  margin: .7rem 0 0;
+  padding: .7rem .9rem;
+  background: var(--parchment-deep);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.55;
+  max-width: none;
+  max-height: 7.5rem;
+  overflow-y: auto;
+}
+
+.scene__text--said {
+  background: #f7efdd;
+  border-color: var(--gold);
+  font-style: italic;
+}
+
+.link--back { flex: none; margin-top: .8rem; }
+
+.interior { flex: 1 1 auto; }
+
+/* --- The Reach Register board --- */
+.ware--quest { align-items: flex-start; }
+.quest__hook {
+  display: block;
+  margin: 0.35rem 0;
+  font-style: italic;
+  color: #3b2f22;
+}
+.quest__detail {
+  display: block;
+  margin: 0.35rem 0;
+  color: #2f2a21;
+  line-height: 1.45;
+}
+.quest__meta {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b5a44;
+}
+.board__trouble {
+  margin: 0.6rem 0;
+  padding: 0.5rem 0.7rem;
+  border-left: 3px solid #8a6a3a;
+  background: rgba(138, 106, 58, 0.08);
+  color: #4a3a26;
+  font-style: italic;
+}
+.board__past {
+  margin-top: 0.8rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed rgba(90, 70, 45, 0.35);
+  font-size: 0.85rem;
+  color: #6b5a44;
+}

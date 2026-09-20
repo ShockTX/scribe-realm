@@ -89,6 +89,14 @@ export interface Character {
   day: number;
   /** companion ids hired at the Salted Gull */
   companions: string[];
+  /** work taken from the Reach Register board */
+  quests: import("../town/quests").Quest[];
+  /** what is actually worn, slot -> shop item id */
+  equipped: import("../game/gear").Equipped;
+  /** gear handed to hires, companion id -> slot map */
+  companionGear: Record<string, import("../game/gear").Equipped>;
+  /** free notes the player keeps per party member */
+  memberNotes: Record<string, string>;
 
   // --- CHOSEN (constrained by the rules) ---
   classes: ClassEntry[];
@@ -142,6 +150,10 @@ export function emptyCharacter(id = crypto.randomUUID()): Character {
     inspiration: false,
     attacks: [],
     pack: [],
+    quests: [],
+    equipped: {},
+    companionGear: {},
+    memberNotes: {},
     day: 1,
     companions: [],
     classes: [],

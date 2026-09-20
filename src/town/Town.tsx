@@ -9,6 +9,10 @@ import {
   type TownLocation,
 } from "./locations";
 import { stockFor, itemById, sellPrice, type ShopItem } from "./shops";
+import { Board } from "./Board";
+import { PartySheet } from "../game/PartySheet";
+import { armorClassFrom } from "../game/gear";
+import { modifiers } from "../rules/derive";
 import {
   ROOM_PRICE,
   MEAL_PRICE,
@@ -21,7 +25,7 @@ function TownMap({ onEnter }: { onEnter: (id: string) => void }) {
   const [hovered, setHovered] = useState<TownLocation | null>(null);
 
   return (
-    <div className="town">
+    <div className="town town--map">
       <header className="town__head">
         <h1>{TOWN_NAME}</h1>
         <p>{hovered ? hovered.trade : "A port town, and a place to begin."}</p>
@@ -50,6 +54,22 @@ function TownMap({ onEnter }: { onEnter: (id: string) => void }) {
           </button>
         ))}
       </div>
+
+      <ul className="town__index">
+        {LOCATIONS.map((loc) => (
+          <li key={loc.id}>
+            <button
+              className="link"
+              onClick={() => onEnter(loc.id)}
+              onMouseEnter={() => setHovered(loc)}
+              onMouseLeave={() => setHovered((h) => (h === loc ? null : h))}
+            >
+              {loc.name}
+            </button>
+            <span className="town__trade">{loc.trade}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -225,6 +245,7 @@ function Interior({
   const [said, setSaid] = useState<string | null>(null);
   const stock = stockFor(loc.id);
   const isInn = loc.id === "tavern";
+  const isBoard = loc.id === "guildhall";
 
   const buy = (item: ShopItem) => {
     setCharacter({
@@ -288,16 +309,22 @@ function Interior({
       </header>
 
       <div className="interior">
-        <div className={loc.art ? "scene" : "scene scene--unpainted"}>
-          {loc.art ? (
-            <img className="scene__art" src={loc.art} alt={`Inside ${loc.name}`} />
-          ) : (
-            <p className="scene__pending">This room has not been painted yet.</p>
-          )}
-          <p className="scene__text">{said ?? loc.description}</p>
+        <div className="stage">
+          <div className={loc.art ? "scene" : "scene scene--unpainted"}>
+            {loc.art ? (
+              <img className="scene__art" src={loc.art} alt={`Inside ${loc.name}`} />
+            ) : (
+              <p className="scene__pending">This room has not been painted yet.</p>
+            )}
+          </div>
+          <p className={said ? "scene__text scene__text--said" : "scene__text"}>
+            {said ?? loc.description}
+          </p>
         </div>
 
-        {isInn ? (
+        {isBoard ? (
+          <Board character={character} setCharacter={setCharacter} say={setSaid} />
+        ) : isInn ? (
           <InnCounter
             character={character}
             onRest={rest}
@@ -337,6 +364,7 @@ export function TownView({
 }) {
   const [local, setLocal] = useState<Character>(character);
   const [where, setWhere] = useState<string | null>(null);
+  const [sheet, setSheet] = useState(false);
   const loc = where ? locationById(where) : undefined;
 
   const update = (c: Character) => {
@@ -349,19 +377,32 @@ export function TownView({
   return (
     <>
       <div className="purse">
-        <strong>{local.name}</strong>
+        <button className="purse__who" onClick={() => setSheet((v) => !v)}>
+          {local.name}
+        </button>
         <span>Day {local.day}</span>
         <span>
           HP {hp}/{maxHp(local).value}
         </span>
-        <span>AC {armorClass(local).value}</span>
+        <span>AC {local.overrides?.armorClass ? armorClass(local).value : armorClassFrom(local.equipped ?? {}, modifiers(local).dex).value}</span>
         <span>{local.coin.gp} gp</span>
         <span>Pack {local.pack.length}</span>
         {local.companions.length > 0 && (
           <span>Party {local.companions.length + 1}</span>
         )}
+        {(local.quests ?? []).some((q) => q.state === "taken") && (
+          <span>
+            Work {(local.quests ?? []).filter((q) => q.state === "taken").length}
+          </span>
+        )}
       </div>
-      {loc ? (
+      {sheet ? (
+        <PartySheet
+          character={local}
+          setCharacter={update}
+          onClose={() => setSheet(false)}
+        />
+      ) : loc ? (
         <Interior
           loc={loc}
           character={local}
