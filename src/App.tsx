@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Creator } from "./creator/Creator";
 import { TownView } from "./town/Town";
+import { Boundary } from "./Boundary";
+import { normalize } from "./model/normalize";
 import type { Character } from "./model/character";
 
 const SAVE_KEY = "scribe-realm:character";
@@ -9,9 +11,16 @@ function load(): Character | null {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    const c = JSON.parse(raw) as Character;
-    return c && c.version === 2 ? c : null;
-  } catch { return null; }
+    return normalize(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+function save(c: Character) {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(c));
+  } catch { /* storage full or blocked; play on */ }
 }
 
 export function App() {
@@ -21,27 +30,44 @@ export function App() {
 
   useEffect(() => { setSaved(load()); }, []);
 
-  const bind = (c: Character) => {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(c));
-    setCharacter(c);
-    setScreen("town");
+  const reset = () => {
+    localStorage.removeItem(SAVE_KEY);
+    setSaved(null);
+    setCharacter(null);
+    setScreen("title");
   };
 
-  if (screen === "create") return <Creator onBind={bind} />;
-  if (screen === "town" && character) return <TownView character={character} onChange={(c) => { localStorage.setItem(SAVE_KEY, JSON.stringify(c)); setCharacter(c); }} />;
+  const bind = (c: Character) => { save(c); setCharacter(c); setScreen("town"); };
 
-  return (
-    <div className="title">
-      <h1>Scribe Realm</h1>
-      <p>A character, a town, and whatever you make of it.</p>
-      <div className="title__acts">
-        <button className="bind" onClick={() => setScreen("create")}>New character</button>
-        {saved && (
-          <button className="link" onClick={() => { setCharacter(saved); setScreen("town"); }}>
-            Continue as {saved.name}
-          </button>
-        )}
+  let body;
+  if (screen === "create") {
+    body = <Creator onBind={bind} />;
+  } else if (screen === "town" && character) {
+    body = (
+      <TownView
+        character={character}
+        onChange={(c) => { save(c); setCharacter(c); }}
+      />
+    );
+  } else {
+    body = (
+      <div className="title">
+        <h1>Scribe Realm</h1>
+        <p>A character, a town, and whatever you make of it.</p>
+        <div className="title__acts">
+          <button className="bind" onClick={() => setScreen("create")}>New character</button>
+          {saved && (
+            <button
+              className="link"
+              onClick={() => { const c = normalize(saved); if (c) { save(c); setCharacter(c); setScreen("town"); } }}
+            >
+              Continue as {saved.name}
+            </button>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  return <Boundary onReset={reset}>{body}</Boundary>;
 }
