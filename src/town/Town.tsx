@@ -10,6 +10,8 @@ import {
 } from "./locations";
 import { stockFor, itemById, sellPrice, type ShopItem } from "./shops";
 import { Board } from "./Board";
+import { SceneView } from "../scene/SceneView";
+import type { Run } from "../scene/run";
 import { PartySheet } from "../game/PartySheet";
 import { armorClassFrom } from "../game/gear";
 import { modifiers } from "../rules/derive";
@@ -236,11 +238,13 @@ function Interior({
   character,
   setCharacter,
   onLeave,
+  onVenture,
 }: {
   loc: TownLocation;
   character: Character;
   setCharacter: (c: Character) => void;
   onLeave: () => void;
+  onVenture: () => void;
 }) {
   const [said, setSaid] = useState<string | null>(null);
   const stock = stockFor(loc.id);
@@ -323,7 +327,7 @@ function Interior({
         </div>
 
         {isBoard ? (
-          <Board character={character} setCharacter={setCharacter} say={setSaid} />
+          <Board character={character} setCharacter={setCharacter} say={setSaid} onVenture={onVenture} />
         ) : isInn ? (
           <InnCounter
             character={character}
@@ -374,6 +378,24 @@ export function TownView({
 
   const hp = local.currentHp || maxHp(local).value;
 
+  const run = local.activeRun as Run | undefined;
+  const runQuest = run
+    ? (local.quests ?? []).find((q) => q.id === run.questId)
+    : undefined;
+
+  if (run && runQuest) {
+    return (
+      <SceneView
+        character={local}
+        setCharacter={update}
+        quest={runQuest}
+        run={run}
+        setRun={(r) => update({ ...local, activeRun: r })}
+        onLeave={() => update({ ...local, activeRun: undefined })}
+      />
+    );
+  }
+
   return (
     <>
       <div className="purse">
@@ -408,6 +430,7 @@ export function TownView({
           character={local}
           setCharacter={update}
           onLeave={() => setWhere(null)}
+          onVenture={() => setWhere(null)}
         />
       ) : (
         <TownMap onEnter={setWhere} />

@@ -6,12 +6,13 @@ import type { Character } from "../model/character";
 import { totalLevel } from "../model/character";
 import {
   askForQuest,
-  completeReward,
   DANGER_WORD,
   GmSilent,
   type QuestSeed,
 } from "./quests";
 import { rumourOfTheDay } from "./inn";
+import { newRun } from "../scene/run";
+import { siteForQuest } from "../scene/sites";
 
 function seedFrom(c: Character): QuestSeed {
   return {
@@ -29,10 +30,12 @@ export function Board({
   character,
   setCharacter,
   say,
+  onVenture,
 }: {
   character: Character;
   setCharacter: (c: Character) => void;
   say: (s: string) => void;
+  onVenture: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [trouble, setTrouble] = useState<string | null>(null);
@@ -75,16 +78,12 @@ export function Board({
     if (q) say(`You take down the bill for ${q.title}. It is yours now.`);
   }
 
-  function finish(id: string) {
+  function venture(id: string) {
     const q = quests.find((x) => x.id === id);
     if (!q) return;
-    const gold = completeReward(q);
-    setCharacter({
-      ...character,
-      coin: { ...character.coin, gp: character.coin.gp + gold },
-      quests: quests.map((x) => (x.id === id ? { ...x, state: "done" } : x)),
-    });
-    say(`${q.giver} pays out ${gold} gp, and says little about it.`);
+    const site = siteForQuest(q.where, q.title);
+    setCharacter({ ...character, activeRun: newRun(q.id, site) });
+    onVenture();
   }
 
   return (
@@ -123,8 +122,8 @@ export function Board({
                 Take it down
               </button>
             ) : (
-              <button className="ware__buy" onClick={() => finish(q.id)}>
-                Report it done — {q.reward} gp
+              <button className="ware__buy" onClick={() => venture(q.id)}>
+                Venture out
               </button>
             )}
           </li>

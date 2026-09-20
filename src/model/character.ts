@@ -89,6 +89,8 @@ export interface Character {
   day: number;
   /** companion ids hired at the Salted Gull */
   companions: string[];
+  /** the quest run currently being played, if any */
+  activeRun?: unknown;
   /** work taken from the Reach Register board */
   quests: import("../town/quests").Quest[];
   /** what is actually worn, slot -> shop item id */

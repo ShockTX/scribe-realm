@@ -31,6 +31,7 @@ export function normalize(raw: unknown): Character | null {
     pack: list<string>(c.pack),
     companions: list<string>(c.companions),
     quests: list(c.quests),
+    activeRun: (c as { activeRun?: unknown }).activeRun ?? undefined,
     equipped: (c.equipped && typeof c.equipped === "object" ? c.equipped : {}) as Character["equipped"],
     companionGear: (c.companionGear && typeof c.companionGear === "object" ? c.companionGear : {}) as Character["companionGear"],
     memberNotes: (c.memberNotes && typeof c.memberNotes === "object" ? c.memberNotes : {}) as Character["memberNotes"],
