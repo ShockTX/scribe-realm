@@ -24,6 +24,9 @@ import {
   type SceneSeed,
 } from "./run";
 import { roomById, siteById, siteForQuest } from "./sites";
+import { CombatPanel } from "./CombatPanel";
+import { beginCombat, type CombatState } from "./combat";
+import { pickFoe } from "./foes";
 
 function seedFor(
   c: Character,
@@ -102,6 +105,7 @@ export function SceneView({
   const [busy, setBusy] = useState(false);
   const [trouble, setTrouble] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
+  const [fight, setFight] = useState<CombatState | null>(null);
   const opened = useRef(false);
   const tail = useRef<HTMLDivElement | null>(null);
 
@@ -292,7 +296,29 @@ export function SceneView({
         </div>
       </div>
 
-      {!run.ending && pending && (
+      {fight && (
+        <CombatPanel
+          character={character}
+          state={fight}
+          setState={setFight}
+          setCharacter={setCharacter}
+          onDone={(summary, ended) => {
+            setFight(null);
+            if (ended === "down") {
+              setRun({
+                ...run,
+                ending: "lost",
+                epilogue: "You go down fighting, and the place keeps you a while.",
+              });
+              setPending(null);
+            } else {
+              void act(summary);
+            }
+          }}
+        />
+      )}
+
+      {!run.ending && !fight && pending && (
         <div className="run__bar">
           {pending.check && (
             <p className="run__stakes">
@@ -300,6 +326,16 @@ export function SceneView({
             </p>
           )}
           <div className="run__suggest">
+            <button
+              className="suggest suggest--fight"
+              disabled={busy}
+              onClick={() => {
+                const foe = pickFoe(site.id, totalLevel(character) || 1);
+                setFight(beginCombat(character, foe.name, foe.count));
+              }}
+            >
+              ⚔ Fight
+            </button>
             {pending.suggestions.map((s) => (
               <button key={s} className="suggest" disabled={busy} onClick={() => void act(s)}>
                 {s}
