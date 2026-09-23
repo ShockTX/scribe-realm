@@ -292,6 +292,32 @@ form.run__type {
   .run__stage {
     display: flex;
   }
+  .run__stage.run__stage--map {
+    display: block;
+    max-height: none;
+    height: 100%;
+  }
+}
+
+/* A mapped site is the way you travel, so it stays on screen. */
+.run__stage.run__stage--map {
+  display: block;
+  overflow: auto;
+  max-height: 48vh;
+}
+
+.run__stage--map .map {
+  border: 0;
+  background: transparent;
+}
+
+.map__spot--here {
+  background: rgba(255, 226, 160, 0.24);
+  border-color: rgba(255, 226, 160, 0.95);
+}
+
+.map__spot--here .map__tag {
+  opacity: 1;
 }
 
 .run__head > div > p {

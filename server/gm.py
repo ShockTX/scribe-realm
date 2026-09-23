@@ -91,7 +91,8 @@ an "epilogue" of two or three sentences. Do not end early unless the player
 has plainly finished or plainly died.
 
 MOVEMENT: you are given the site's rooms. If the action moves the party, set
-"moveTo" to that room's id.
+"moveTo" to that room's id. If they say they are making for a named area,
+they have gone there — narrate that place, and set moveTo to its id.
 
 FIGHTS: if someone is drawing steel and the outcome should be a fight rather
 than a single check, set "fight" to {"name": "<creature>", "count": <int>}.

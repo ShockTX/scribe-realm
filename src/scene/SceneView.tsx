@@ -28,7 +28,7 @@ import {
   type SceneSeed,
   type Settlement,
 } from "./run";
-import { roomById, siteById, siteForQuest } from "./sites";
+import { roomById, siteById, siteForQuest, siteIsMapped } from "./sites";
 import { CombatPanel } from "./CombatPanel";
 import { beginCombat, type CombatState } from "./combat";
 import { pickFoe } from "./foes";
@@ -139,6 +139,58 @@ export function SceneView({
     setCharacter(risen.character);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run.ending]);
+
+  /** Walking the map. No roll — leaving is the choice. The next beat is the arrival. */
+  async function travel(roomId: string) {
+    if (busy || !pending || run.ending || fight) return;
+    const dest = roomById(site, roomId);
+    if (!dest || dest.id === run.roomId) return;
+    setBusy(true);
+    setTrouble(null);
+    setTyped("");
+    const action = `I leave ${room?.name ?? "here"} and make for ${dest.name}.`;
+    const done: Beat = { ...run.beats[run.beats.length - 1], action };
+    const beats = [...run.beats.slice(0, -1), done];
+    const mid: Run = { ...run, beats, roomId: dest.id };
+    if (beats.length >= mid.length + 2) {
+      setRun({
+        ...mid,
+        ending: "cost",
+        epilogue: "You have had enough of this place, and you leave with what you have.",
+      });
+      setPending(null);
+      setBusy(false);
+      return;
+    }
+    try {
+      const reply = await askScene(seedFor(character, quest, mid, { action }));
+      setCharacter(rememberFacts(character, [reply.remember]));
+      const arrived = reply.moveTo && roomById(site, reply.moveTo) ? reply.moveTo : dest.id;
+      if (reply.ending) {
+        setRun({
+          ...mid,
+          roomId: arrived,
+          ending: reply.ending,
+          epilogue: reply.epilogue ?? reply.situation,
+          ledger: reply.remember ? [...mid.ledger, reply.remember] : mid.ledger,
+        });
+        setPending(null);
+      } else {
+        setPending(reply);
+        setRun({
+          ...mid,
+          roomId: arrived,
+          beats: [...beats, { n: beats.length + 1, roomId: arrived, situation: reply.situation }],
+          ledger: reply.remember ? [...mid.ledger, reply.remember] : mid.ledger,
+        });
+      }
+    } catch (e) {
+      setTrouble(e instanceof GmSilent ? e.message : "the Warden is silent");
+      setRun(mid);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function startFight(name: string, count: number) {
     if (foughtBeat.current === run.beats.length) return;
@@ -295,8 +347,35 @@ export function SceneView({
       </header>
 
       <div className="run__body">
-        <div className="run__stage">
-          <img className="run__art" src={site.art} alt={site.name} />
+        <div className={siteIsMapped(site) ? "run__stage run__stage--map" : "run__stage"}>
+          {siteIsMapped(site) ? (
+            <div className="map">
+              <img className="map__art" src={site.art} alt={`A map of ${site.name}`} />
+              {site.rooms.map((r) =>
+                r.hotspot ? (
+                  <button
+                    key={r.id}
+                    type="button"
+                    className={r.id === run.roomId ? "map__spot map__spot--here" : "map__spot"}
+                    style={{
+                      left: `${r.hotspot.left}%`,
+                      top: `${r.hotspot.top}%`,
+                      width: `${r.hotspot.width}%`,
+                      height: `${r.hotspot.height}%`,
+                    }}
+                    disabled={busy || !!fight || !!run.ending || !pending}
+                    onClick={() => void travel(r.id)}
+                    aria-label={r.name}
+                    aria-current={r.id === run.roomId ? "true" : undefined}
+                  >
+                    <span className="map__tag">{r.name}</span>
+                  </button>
+                ) : null,
+              )}
+            </div>
+          ) : (
+            <img className="run__art" src={site.art} alt={site.name} />
+          )}
         </div>
 
         <div className="run__log">
