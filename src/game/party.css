@@ -378,3 +378,49 @@
   .sheet { grid-template-columns: 1fr; }
   .skills, .spells, .carried { columns: 1; }
 }
+
+/* ===== the purse bar: it had no styling at all ===== */
+
+.purse {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 0.35rem 1.1rem;
+  background: #2a2119;
+  border-bottom: 1px solid rgba(212, 186, 140, 0.35);
+  color: #e9dbc2;
+  font-size: 0.86rem;
+  letter-spacing: 0.02em;
+}
+
+.purse > span { white-space: nowrap; opacity: 0.92; }
+
+.purse .purse__who {
+  color: #f0c97a;
+  font-size: 0.98rem;
+  text-decoration-color: rgba(240, 201, 122, 0.5);
+}
+.purse .purse__who:hover { color: #ffdc96; text-decoration-color: #ffdc96; }
+
+/* ===== the sheet sits on its own parchment, not on the dark page ===== */
+
+.party {
+  height: calc(100vh - 2.2rem);
+  max-height: calc(100vh - 2.2rem);
+  overflow: hidden;
+  background: var(--parchment, #f4ead4);
+  color: #3a2614;
+  padding: 0.9rem 1.15rem 1.15rem;
+  box-shadow: 0 0 80px rgba(0, 0, 0, 0.6);
+}
+
+.party__head h2 { margin: 0; color: #3a2614; }
+
+/* legibility: the muted greys were too faint on parchment */
+.vital__k, .ability__k { opacity: 0.8; color: #6b4a29; }
+.vital__sub, .ability__save { opacity: 0.75; color: #5d4126; }
+.muted { opacity: 0.8; color: #5d4126; }
+.slot__label { opacity: 0.78; color: #6b4a29; }
+.slot:not(.slot--filled) .slot__value { opacity: 0.65; color: #6b4a29; }
+.skill__n { opacity: 1; color: #4a331e; }
