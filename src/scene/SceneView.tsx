@@ -18,10 +18,12 @@ import {
   beatLine,
   GmSilent,
   newRun,
+  settleRun,
   type Beat,
   type Run,
   type SceneReply,
   type SceneSeed,
+  type Settlement,
 } from "./run";
 import { roomById, siteById, siteForQuest } from "./sites";
 import { CombatPanel } from "./CombatPanel";
@@ -106,7 +108,27 @@ export function SceneView({
   const [trouble, setTrouble] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
   const [fight, setFight] = useState<CombatState | null>(null);
+  const [paid, setPaid] = useState<Settlement | null>(null);
   const opened = useRef(false);
+  // Settlement: the only place a finished run pays out. Runs once.
+  const settled = useRef(false);
+  useEffect(() => {
+    if (!run.ending || settled.current) return;
+    settled.current = true;
+    const s = settleRun(run, quest.reward, quest.danger, totalLevel(character) || 1);
+    setPaid(s);
+    setCharacter({
+      ...character,
+      xp: (character.xp ?? 0) + s.xp,
+      coin: { ...character.coin, gp: character.coin.gp + s.gold },
+      pack: [...character.pack, ...s.loot],
+      quests: (character.quests ?? []).map((q) =>
+        q.id === quest.id ? { ...q, state: "done" as const } : q,
+      ),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run.ending]);
+
   const tail = useRef<HTMLDivElement | null>(null);
 
   // The opening beat, asked for once.
@@ -290,6 +312,13 @@ export function SceneView({
                     : "It got away"}
               </h2>
               <p>{run.epilogue}</p>
+              {paid && (
+                <ul className="ending__paid">
+                  {paid.lines.map((l) => (
+                    <li key={l}>{l}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
           <div ref={tail} />

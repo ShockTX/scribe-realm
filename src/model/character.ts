@@ -85,6 +85,8 @@ export interface Character {
   // --- WORLD (the town keeps these) ---
   /** shop item ids the character is carrying, with duplicates allowed */
   pack: string[];
+  /** experience earned from finished work */
+  xp: number;
   /** in-game day, advanced by sleeping at the inn */
   day: number;
   /** companion ids hired at the Salted Gull */
@@ -152,6 +154,7 @@ export function emptyCharacter(id = crypto.randomUUID()): Character {
     inspiration: false,
     attacks: [],
     pack: [],
+    xp: 0,
     quests: [],
     equipped: {},
     companionGear: {},

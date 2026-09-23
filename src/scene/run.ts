@@ -58,6 +58,8 @@ export interface Run {
   epilogue?: string;
   /** paid on a won or cost ending */
   payout?: number;
+  /** shop item ids carried out of the site */
+  loot?: string[];
 }
 
 const ABILITIES: Ability[] = ["str", "dex", "con", "int", "wis", "cha"];
@@ -237,4 +239,40 @@ export function beatLine(b: Beat): string {
 
 export function runIsOver(run: Run): boolean {
   return run.ending !== null;
+}
+
+
+/* ------------------------------------------------------------------ *
+ * Settlement. The run is over; this is the only place the world pays. *
+ * ------------------------------------------------------------------ */
+
+export interface Settlement {
+  gold: number;
+  xp: number;
+  loot: string[];
+  /** plain-English lines for the ending panel */
+  lines: string[];
+}
+
+/** XP is derived from the quest's danger and how the run ended. */
+export function settleRun(
+  run: Run,
+  questReward: number,
+  danger: string,
+  level: number,
+): Settlement {
+  if (!run.ending || run.ending === "lost") {
+    return { gold: 0, xp: 0, loot: [], lines: ["You come back with nothing but the walk."] };
+  }
+  const share = run.ending === "won" ? 1 : 0.5;
+  const gold = Math.max(1, Math.round(questReward * share));
+  const base = danger === "deadly" ? 200 : danger === "hard" ? 120 : danger === "risky" ? 75 : 40;
+  const xp = Math.max(10, Math.round(base * share * Math.max(1, level)));
+  const loot = run.loot ?? [];
+  const lines = [
+    `${gold} gp` + (run.ending === "cost" ? " — half, for half a job" : ""),
+    `${xp} xp`,
+  ];
+  if (loot.length) lines.push(`${loot.length} thing${loot.length > 1 ? "s" : ""} carried out`);
+  return { gold, xp, loot, lines };
 }
