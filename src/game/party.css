@@ -424,3 +424,43 @@
 .slot__label { opacity: 0.78; color: #6b4a29; }
 .slot:not(.slot--filled) .slot__value { opacity: 0.65; color: #6b4a29; }
 .skill__n { opacity: 1; color: #4a331e; }
+
+.rise {
+  flex: none;
+  margin: 0.55rem 1.1rem 0;
+  padding: 0.7rem 0.9rem 0.8rem;
+  background: #2a2119;
+  color: #e9dbc2;
+  border: 1px solid rgba(212, 186, 140, 0.35);
+}
+
+.rise__title {
+  margin: 0 0 0.15rem;
+  color: #f0c97a;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+
+.rise__line { margin: 0.2rem 0; }
+
+.rise__feats {
+  margin: 0.25rem 0 0.45rem;
+  padding-left: 1.1rem;
+}
+
+.rise__opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.35rem 0;
+}
+
+.rise--sheet {
+  margin: 0.45rem 0 0.2rem;
+  background: transparent;
+  color: #3a2614;
+  border-color: rgba(74, 51, 30, 0.35);
+}
+
+.rise--sheet .rise__line { color: #3a2614; }
+

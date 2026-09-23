@@ -39,6 +39,8 @@ Rules for every quest you write:
 - The reward must be plain coin, and proportionate: roughly 10-25 gp per level.
 - Write like a person, not a quest log. No "embark on a journey". No algebra.
 - Never repeat a quest already listed as taken.
+- You may be told what the town remembers. Those facts happened. Do not contradict them, and do not decide they were undone.
+- You still never set hit points, gold, or inventory. You write work, not a character sheet.
 - The hook is one or two sentences someone would actually say out loud.
 
 Reply with ONLY a JSON object, no prose around it, shaped exactly:
@@ -91,6 +93,13 @@ has plainly finished or plainly died.
 MOVEMENT: you are given the site's rooms. If the action moves the party, set
 "moveTo" to that room's id.
 
+FIGHTS: if someone is drawing steel and the outcome should be a fight rather
+than a single check, set "fight" to {"name": "<creature>", "count": <int>}.
+Name something a stat block would recognise: bandit, goblin, skeleton, zombie,
+giant rat, wolf, cultist. count is how many, usually 1 to 3.
+You do not set their hit points, their attacks, or whether the player hits.
+Omit "fight" when nobody is fighting. Do not set a fight and an ending together.
+
 Reply with ONLY a JSON object, no prose around it:
 {
  "situation": str,
@@ -101,6 +110,7 @@ Reply with ONLY a JSON object, no prose around it:
  "onFailure": {"text": str, "consequence": {...}},
  "moveTo": str | omit,
  "remember": str | omit,
+ "fight": {"name": str, "count": int} | omit,
  "ending": "won"|"cost"|"lost" | omit,
  "epilogue": str | omit
 }
@@ -142,6 +152,12 @@ def quest_prompt(payload):
     )
     if taken:
         p += "Already taken (do not repeat): " + "; ".join(taken) + "\n"
+    if payload.get("memory"):
+        facts = [f for f in payload["memory"] if isinstance(f, str)]
+        if facts:
+            p += "What the town remembers (these happened):\n"
+            for f in facts[-16:]:
+                p += f"  - {f}\n"
     if payload.get("rumour"):
         p += f"A rumour going round the inn: {payload['rumour']}\n"
     return p + "\nWrite one new posting for the Reach Register board."

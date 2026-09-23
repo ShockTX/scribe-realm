@@ -33,6 +33,7 @@ import {
   type Slot,
   type Equipped,
 } from "./gear";
+import { subclassDue, chooseSubclass } from "../rules/advance";
 import { partyOf, type SheetMember } from "./party";
 import { skillByIndex } from "../rules/srd";
 
@@ -172,6 +173,7 @@ function HeroSheet({
   const dc = spellSaveDc(character);
   const atk = spellAttackBonus(character);
   const slots = spellSlots(character);
+  const due = subclassDue(character);
 
   const setEquipped = (next: Equipped) =>
     setCharacter({ ...character, equipped: next });
@@ -214,6 +216,26 @@ function HeroSheet({
             <span className="vital__k">Hit die</span>
           </div>
         </div>
+        {due && (
+          <div className="rise rise--sheet">
+            <p className="rise__line">Choose a {due.flavor.toLowerCase()}.</p>
+            <div className="rise__opts">
+              {due.options.map((o) => (
+                <button
+                  key={o.index}
+                  type="button"
+                  className="suggest"
+                  onClick={() => setCharacter(chooseSubclass(character, o.index))}
+                >
+                  {o.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {character.classes[0]?.subclassIndex && (
+          <p className="rise__line">{character.classes[0].subclassIndex.replace(/-/g, " ")}</p>
+        )}
 
         <div className="abilities">
           {ABILITIES.map((a) => (

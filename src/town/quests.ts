@@ -90,13 +90,19 @@ export async function askForQuest(
   seed: QuestSeed,
   taken: string[],
   rumour?: string,
+  memory?: string[],
 ): Promise<Quest> {
   let res: Response;
   try {
     res = await fetch(GM_QUEST, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ character: seed, taken, rumour }),
+      body: JSON.stringify({
+        character: seed,
+        taken,
+        rumour,
+        memory: (memory ?? []).slice(-24),
+      }),
     });
   } catch {
     throw new GmSilent("the road to the Register is out");
@@ -122,7 +128,7 @@ export async function gmAwake(): Promise<boolean> {
   }
 }
 
-/** Experience is not levelling yet, but the coin is real. */
+/** The coin posted on the bill. Experience is settled by the run, not here. */
 export function completeReward(q: Quest): number {
   return q.reward;
 }

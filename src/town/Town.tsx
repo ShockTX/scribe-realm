@@ -1,5 +1,5 @@
-import { useState } from "react";
-import type { Character } from "../model/character";
+import { useEffect, useRef, useState } from "react";
+import { totalLevel, type Character } from "../model/character";
 import { armorClass, maxHp } from "../rules/derive";
 import {
   LOCATIONS,
@@ -13,6 +13,9 @@ import { Board } from "./Board";
 import { SceneView } from "../scene/SceneView";
 import type { Run } from "../scene/run";
 import { PartySheet } from "../game/PartySheet";
+import { LevelRise } from "../game/LevelRise";
+import { applyLevels, type LevelNote } from "../rules/advance";
+import { rememberFacts } from "../model/memory";
 import { armorClassFrom } from "../game/gear";
 import { modifiers } from "../rules/derive";
 import {
@@ -369,12 +372,27 @@ export function TownView({
   const [local, setLocal] = useState<Character>(character);
   const [where, setWhere] = useState<string | null>(null);
   const [sheet, setSheet] = useState(false);
+  const [rise, setRise] = useState<LevelNote[]>([]);
+  const localRef = useRef(local);
+  localRef.current = local;
   const loc = where ? locationById(where) : undefined;
 
   const update = (c: Character) => {
+    localRef.current = c;
     setLocal(c);
     onChange?.(c);
   };
+
+  // A save can hold XP from before levels existed. Catch it up in town,
+  // never mid-run — the scene announces a level earned at the table.
+  useEffect(() => {
+    if (local.activeRun) return;
+    const risen = applyLevels(local);
+    if (!risen.notes.length) return;
+    update(risen.character);
+    setRise(risen.notes);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [local.xp, local.activeRun]);
 
   const hp = local.currentHp || maxHp(local).value;
 
@@ -390,8 +408,12 @@ export function TownView({
         setCharacter={update}
         quest={runQuest}
         run={run}
-        setRun={(r) => update({ ...local, activeRun: r })}
-        onLeave={() => update({ ...local, activeRun: undefined })}
+        setRun={(r) => update({ ...localRef.current, activeRun: r })}
+        onLeave={() => {
+          const current = localRef.current;
+          const runNow = current.activeRun as Run | undefined;
+          update(rememberFacts({ ...current, activeRun: undefined }, runNow?.ledger ?? []));
+        }}
       />
     );
   }
@@ -402,6 +424,7 @@ export function TownView({
         <button className="purse__who" onClick={() => setSheet((v) => !v)}>
           {local.name}
         </button>
+        <span>Level {totalLevel(local) || 1}</span>
         <span>Day {local.day}</span>
         <span>
           HP {hp}/{maxHp(local).value}
@@ -418,6 +441,14 @@ export function TownView({
           </span>
         )}
       </div>
+      {!local.activeRun && (
+        <LevelRise
+          notes={rise}
+          character={local}
+          setCharacter={update}
+          onDismiss={() => setRise([])}
+        />
+      )}
       {sheet ? (
         <PartySheet
           character={local}

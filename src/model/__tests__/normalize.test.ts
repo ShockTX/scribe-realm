@@ -17,6 +17,15 @@ describe("loading an old save", () => {
     expect(c.coin.gp).toBe(32);
     expect(c.coin.sp).toBe(0);
     expect(c.spells.known).toEqual([]);
+    expect(c.memory).toEqual([]);
+  });
+
+  it("keeps facts the town already remembers", () => {
+    const c = normalize({
+      version: 2, id: "z", name: "Mira",
+      memory: ["The shelf fell.", 4, "  ", "The clerk knows your name."],
+    })!;
+    expect(c.memory).toEqual(["The shelf fell.", "The clerk knows your name."]);
   });
 
   it("keeps a current save untouched", () => {

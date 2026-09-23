@@ -8,6 +8,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { Character } from "../model/character";
 import { totalLevel } from "../model/character";
+import { worldLedger, rememberFacts } from "../model/memory";
+import { applyLevels, type LevelNote } from "../rules/advance";
+import { LevelRise } from "../game/LevelRise";
 import { maxHp } from "../rules/derive";
 import { COMPANIONS } from "../town/inn";
 import type { Quest } from "../town/quests";
@@ -60,7 +63,7 @@ function seedFor(
     },
     roomId: run.roomId,
     recent: run.beats.slice(-4).map(beatLine),
-    ledger: run.ledger.slice(-12),
+    ledger: worldLedger(c.memory, run.ledger),
     beat: run.beats.length + 1,
     of: run.length,
     ...extra,
@@ -109,7 +112,9 @@ export function SceneView({
   const [typed, setTyped] = useState("");
   const [fight, setFight] = useState<CombatState | null>(null);
   const [paid, setPaid] = useState<Settlement | null>(null);
+  const [rise, setRise] = useState<LevelNote[]>([]);
   const opened = useRef(false);
+  const foughtBeat = useRef<number | null>(null);
   // Settlement: the only place a finished run pays out. Runs once.
   const settled = useRef(false);
   useEffect(() => {
@@ -117,17 +122,35 @@ export function SceneView({
     settled.current = true;
     const s = settleRun(run, quest.reward, quest.danger, totalLevel(character) || 1);
     setPaid(s);
-    setCharacter({
-      ...character,
-      xp: (character.xp ?? 0) + s.xp,
-      coin: { ...character.coin, gp: character.coin.gp + s.gold },
-      pack: [...character.pack, ...s.loot],
-      quests: (character.quests ?? []).map((q) =>
-        q.id === quest.id ? { ...q, state: "done" as const } : q,
-      ),
-    });
+    const paidChar = rememberFacts(
+      {
+        ...character,
+        xp: (character.xp ?? 0) + s.xp,
+        coin: { ...character.coin, gp: character.coin.gp + s.gold },
+        pack: [...character.pack, ...s.loot],
+        quests: (character.quests ?? []).map((q) =>
+          q.id === quest.id ? { ...q, state: "done" as const } : q,
+        ),
+      },
+      run.ledger,
+    );
+    const risen = applyLevels(paidChar);
+    setRise(risen.notes);
+    setCharacter(risen.character);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run.ending]);
+
+  function startFight(name: string, count: number) {
+    if (foughtBeat.current === run.beats.length) return;
+    foughtBeat.current = run.beats.length;
+    setFight(beginCombat(character, name, count));
+  }
+
+  useEffect(() => {
+    if (!pending?.fight || fight || run.ending) return;
+    startFight(pending.fight.name, pending.fight.count);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending, fight, run.ending, run.beats.length]);
 
   const tail = useRef<HTMLDivElement | null>(null);
 
@@ -149,6 +172,7 @@ export function SceneView({
     try {
       const reply = await askScene(seedFor(character, quest, run, {}));
       setPending(reply);
+      setCharacter(rememberFacts(character, [reply.remember]));
       setRun({
         ...run,
         beats: [
@@ -171,8 +195,8 @@ export function SceneView({
     setTyped("");
 
     const judged = adjudicate(character, pending);
-    setCharacter(judged.after);
-
+    const carry = (extra?: string) =>
+      rememberFacts(judged.after, [judged.consequence.remember, extra]);
     const done: Beat = {
       ...run.beats[run.beats.length - 1],
       action,
@@ -191,6 +215,7 @@ export function SceneView({
     // Death ends a run regardless of what the Warden intended.
     const hpNow = judged.after.currentHp;
     if (hpNow <= 0) {
+      setCharacter(carry());
       setRun({
         ...mid,
         ending: "lost",
@@ -204,6 +229,7 @@ export function SceneView({
 
     if (beats.length >= mid.length + 2) {
       // Hard stop, so a Warden that never resolves cannot run forever.
+      setCharacter(carry());
       setRun({ ...mid, ending: "cost", epilogue: "You have had enough of this place, and you leave with what you have." });
       setPending(null);
       setBusy(false);
@@ -225,6 +251,7 @@ export function SceneView({
             : undefined,
         }),
       );
+      setCharacter(carry(reply.remember));
       if (reply.ending) {
         setRun({
           ...mid,
@@ -246,6 +273,7 @@ export function SceneView({
       }
     } catch (e) {
       setTrouble(e instanceof GmSilent ? e.message : "the Warden is silent");
+      setCharacter(carry());
       setRun(mid);
     } finally {
       setBusy(false);
@@ -300,6 +328,15 @@ export function SceneView({
             <p className="beat__trouble">
               {trouble}. <button className="link" onClick={() => void open()}>Try again</button>
             </p>
+          )}
+
+          {run.ending && (
+            <LevelRise
+              notes={rise}
+              character={character}
+              setCharacter={setCharacter}
+              onDismiss={() => setRise([])}
+            />
           )}
 
           {run.ending && (
@@ -360,7 +397,7 @@ export function SceneView({
               disabled={busy}
               onClick={() => {
                 const foe = pickFoe(site.id, totalLevel(character) || 1);
-                setFight(beginCombat(character, foe.name, foe.count));
+                startFight(foe.name, foe.count);
               }}
             >
               ⚔ Fight

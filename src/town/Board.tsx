@@ -57,6 +57,7 @@ export function Board({
         seedFrom(character),
         quests.map((x) => x.title),
         rumourOfTheDay(character.day),
+        character.memory,
       );
       setCharacter({ ...character, quests: [...quests, q] });
       say(`The clerk pins up a new bill: ${q.title}.`);

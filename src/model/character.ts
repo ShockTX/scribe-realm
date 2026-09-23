@@ -87,6 +87,11 @@ export interface Character {
   pack: string[];
   /** experience earned from finished work */
   xp: number;
+  /**
+   * Durable facts, kept after a run ends. The town and the Warden both
+   * read this. It is never hit points, gold, or inventory.
+   */
+  memory: string[];
   /** in-game day, advanced by sleeping at the inn */
   day: number;
   /** companion ids hired at the Salted Gull */
@@ -155,6 +160,7 @@ export function emptyCharacter(id = crypto.randomUUID()): Character {
     attacks: [],
     pack: [],
     xp: 0,
+    memory: [],
     quests: [],
     equipped: {},
     companionGear: {},

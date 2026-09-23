@@ -118,6 +118,11 @@ export interface SceneReply {
   /** the room the action moved us to */
   moveTo?: string;
   remember?: string;
+  /**
+   * Set when the fiction has become a fight. The engine matches the name
+   * to a real stat block and rolls every attack. Absent when nobody draws steel.
+   */
+  fight?: { name: string; count: number };
 }
 
 function str(v: unknown, fallback = ""): string {
@@ -130,6 +135,15 @@ function readBranch(raw: unknown, level: number): { text: string; consequence?: 
   const text = str(r.text);
   if (!text) return undefined;
   return { text, consequence: readConsequence(r.consequence, level) };
+}
+
+function readFight(raw: unknown): { name: string; count: number } | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  const name = str(r.name).slice(0, 80);
+  if (!name) return undefined;
+  const n = typeof r.count === "number" && Number.isFinite(r.count) ? Math.round(r.count) : 1;
+  return { name, count: Math.max(1, Math.min(6, n || 1)) };
 }
 
 function readCheck(raw: unknown): CheckRequest | undefined {
@@ -171,6 +185,7 @@ export function readScene(raw: unknown, level: number): SceneReply {
     epilogue: str(r.epilogue) || undefined,
     moveTo: str(r.moveTo) || undefined,
     remember: str(r.remember) || undefined,
+    fight: readFight(r.fight),
   };
 }
 
@@ -192,7 +207,7 @@ export async function askScene(seed: SceneSeed): Promise<SceneReply> {
         : `the Warden would not answer (${res.status})`,
     );
   }
-  return readScene(await res.json(), 1);
+  return readScene(await res.json(), Math.max(1, Math.round(seed.character.level) || 1));
 }
 
 /**
@@ -254,6 +269,13 @@ export interface Settlement {
   lines: string[];
 }
 
+/** Quest danger is low | fair | grim. Older words still pay, so a stale prompt is not silent. */
+export function dangerBase(danger: string): number {
+  if (danger === "grim" || danger === "deadly" || danger === "hard") return 120;
+  if (danger === "fair" || danger === "risky") return 75;
+  return 40;
+}
+
 /** XP is derived from the quest's danger and how the run ended. */
 export function settleRun(
   run: Run,
@@ -266,7 +288,7 @@ export function settleRun(
   }
   const share = run.ending === "won" ? 1 : 0.5;
   const gold = Math.max(1, Math.round(questReward * share));
-  const base = danger === "deadly" ? 200 : danger === "hard" ? 120 : danger === "risky" ? 75 : 40;
+  const base = dangerBase(danger);
   const xp = Math.max(10, Math.round(base * share * Math.max(1, level)));
   const loot = run.loot ?? [];
   const lines = [
