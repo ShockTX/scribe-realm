@@ -59,6 +59,14 @@ export function tierCap(level: number): 1 | 2 | 3 {
 }
 
 /**
+ * How many of a thing a character of this level can be asked to fight.
+ * One definition, used by both the scene parser and the combat engine.
+ */
+export function foeCeiling(level: number): number {
+  return level >= 3 ? 4 : 3;
+}
+
+/**
  * Pick a foe suited to the place and the character's level.
  * Used by the FIGHT button, where the player picks the fight rather than the
  * Warden. Site flavour decides the pool; tier cap decides what's survivable.
@@ -69,6 +77,7 @@ export function pickFoe(siteId: string, level: number): { name: string; count: n
     "crystal-cavern": ["crystal-crawler", "giant-rat", "kobold", "stirge"],
     "hill-ruin": ["bandit", "goblin", "hobgoblin", "cultist"],
     "deep-vault": ["skeleton", "zombie", "drowned-one", "ghoul", "bone-guard"],
+    wilds: ["bandit", "giant-rat", "stirge", "goblin", "kobold"],
   };
   const ids = flavour[siteId] ?? FOES.map((f) => f.id);
   const pool = ids

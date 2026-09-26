@@ -13,6 +13,7 @@
 import type { Ability, Character } from "../model/character";
 import { totalLevel } from "../model/character";
 import { maxHp } from "../rules/derive";
+import { foeCeiling } from "./foes";
 import {
   applyConsequence,
   branchOf,
@@ -137,13 +138,15 @@ function readBranch(raw: unknown, level: number): { text: string; consequence?: 
   return { text, consequence: readConsequence(r.consequence, level) };
 }
 
-function readFight(raw: unknown): { name: string; count: number } | undefined {
+function readFight(raw: unknown, level: number): { name: string; count: number } | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const r = raw as Record<string, unknown>;
   const name = str(r.name).slice(0, 80);
   if (!name) return undefined;
   const n = typeof r.count === "number" && Number.isFinite(r.count) ? Math.round(r.count) : 1;
-  return { name, count: Math.max(1, Math.min(6, n || 1)) };
+  // Same ceiling beginCombat() enforces. Two different caps in two files meant
+  // the parsed number was never the number fought.
+  return { name, count: Math.max(1, Math.min(foeCeiling(level), n || 1)) };
 }
 
 function readCheck(raw: unknown): CheckRequest | undefined {
@@ -185,7 +188,7 @@ export function readScene(raw: unknown, level: number): SceneReply {
     epilogue: str(r.epilogue) || undefined,
     moveTo: str(r.moveTo) || undefined,
     remember: str(r.remember) || undefined,
-    fight: readFight(r.fight),
+    fight: readFight(r.fight, level),
   };
 }
 

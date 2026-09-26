@@ -60,6 +60,20 @@ export function proficiencyBonus(c: Character): Derived {
 }
 
 /** First level is a full hit die; later levels take the class average. */
+/**
+ * The character's current hit points, always a real number in [0, max].
+ *
+ * Use this and never `c.currentHp || maxHp(c).value`. Zero is falsy in
+ * JavaScript, so that idiom silently read a character who had just been
+ * dropped to 0 as undamaged — which is why going down in a fight used to
+ * cost nothing. Absent-field saves are repaired in normalize(), not here.
+ */
+export function hpOf(c: Character): number {
+  const max = maxHp(c).value;
+  const now = typeof c.currentHp === "number" && Number.isFinite(c.currentHp) ? c.currentHp : max;
+  return Math.max(0, Math.min(max, now));
+}
+
 export function maxHp(c: Character): Derived {
   const con = modifiers(c).con;
   let hp = 0;

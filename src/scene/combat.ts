@@ -21,10 +21,11 @@ import {
   spellAttackBonus,
   spellSaveDc,
   spellSlots,
+  hpOf,
 } from "../rules/derive";
 import { WEAPONS, type WeaponSpec } from "../game/gear";
 import { d20, roll } from "./dice";
-import { matchFoe, tierCap, type FoeSpec } from "./foes";
+import { matchFoe, tierCap, foeCeiling, type FoeSpec } from "./foes";
 import { spellEffect, type SpellEffect } from "./spells";
 import { usable } from "./items";
 
@@ -136,7 +137,7 @@ export function beginCombat(c: Character, foeName: string, count: number): Comba
     // model's sake.
     spec = matchFoe(cap === 1 ? "bandit" : "hobgoblin");
   }
-  const howMany = Math.max(1, Math.min(level >= 3 ? 4 : 3, Math.round(count) || 1));
+  const howMany = Math.max(1, Math.min(foeCeiling(level), Math.round(count) || 1));
   return {
     foes: Array.from({ length: howMany }, (_, i) => foeToCombatant(spec, i + 1)),
     round: 1,
@@ -153,7 +154,7 @@ export function beginCombat(c: Character, foeName: string, count: number): Comba
       },
     ],
     over: null,
-    hpNow: c.currentHp || maxHp(c).value,
+    hpNow: hpOf(c),
   };
 }
 

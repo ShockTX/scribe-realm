@@ -11,7 +11,7 @@ import { totalLevel } from "../model/character";
 import { worldLedger, rememberFacts } from "../model/memory";
 import { applyLevels, type LevelNote } from "../rules/advance";
 import { LevelRise } from "../game/LevelRise";
-import { maxHp } from "../rules/derive";
+import { maxHp, hpOf } from "../rules/derive";
 import { COMPANIONS } from "../town/inn";
 import type { Quest } from "../town/quests";
 import { OUTCOME_WORD, type Roll } from "./dice";
@@ -47,7 +47,7 @@ function seedFor(
       level: totalLevel(c) || 1,
       klass: c.classes[0]?.classIndex ?? "adventurer",
       race: c.raceIndex ?? "human",
-      hp: c.currentHp || hpMax,
+      hp: hpOf(c),
       maxHp: hpMax,
       gp: c.coin.gp,
       skills: c.skillProficiencies,

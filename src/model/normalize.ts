@@ -5,6 +5,7 @@
  * crash.
  */
 import { DEFAULT_SCORES, emptyCharacter, type Character } from "./character";
+import { maxHp } from "../rules/derive";
 
 function num(v: unknown, fallback: number): number {
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;
@@ -21,7 +22,7 @@ export function normalize(raw: unknown): Character | null {
   const base = emptyCharacter();
   if (typeof c.id === "string" && c.id) base.id = c.id as Character["id"];
 
-  return {
+  const built = {
     ...base,
     ...c,
     version: 2,
@@ -60,4 +61,11 @@ export function normalize(raw: unknown): Character | null {
     deathSaveFailures: num(c.deathSaveFailures, 0),
     inspiration: c.inspiration === true,
   } as Character;
+
+  // Old saves predate currentHp. Absent means "never been hurt" — full.
+  // An explicit 0 means the character went down, and must survive the load.
+  const hadHp = typeof c.currentHp === "number" && Number.isFinite(c.currentHp);
+  const max = maxHp(built).value;
+  built.currentHp = hadHp ? Math.max(0, Math.min(max, c.currentHp as number)) : max;
+  return built;
 }

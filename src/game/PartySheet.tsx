@@ -19,6 +19,7 @@ import {
   spellSlots,
   spellName,
   hitDie,
+  hpOf,
 } from "../rules/derive";
 import { itemById } from "../town/shops";
 import {
@@ -192,7 +193,7 @@ function HeroSheet({
             <span className="vital__sub">{ac.from === "unarmoured" ? "unarmoured" : itemName(ac.from.split(" + ")[0]) + (ac.from.includes("shield") ? " + shield" : "")}</span>
           </div>
           <div className="vital">
-            <span className="vital__n">{character.currentHp || 0}</span>
+            <span className="vital__n">{hpOf(character)}</span>
             <span className="vital__k">Hit points</span>
           </div>
           <div className="vital">

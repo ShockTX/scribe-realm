@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { totalLevel, type Character } from "../model/character";
-import { armorClass, maxHp } from "../rules/derive";
+import { armorClass, maxHp, hpOf } from "../rules/derive";
 import {
   LOCATIONS,
   TOWN_MAP_ART,
@@ -176,7 +176,7 @@ function InnCounter({
 }) {
   const companion = companionOfTheDay(character.day, character);
   const hired = companion ? character.companions.includes(companion.id) : false;
-  const hp = character.currentHp || maxHp(character).value;
+  const hp = hpOf(character);
   const full = hp >= maxHp(character).value;
 
   return (
@@ -290,7 +290,7 @@ function Interior({
 
   const meal = () => {
     const full = maxHp(character).value;
-    const hp = character.currentHp || full;
+    const hp = hpOf(character);
     setCharacter({
       ...character,
       coin: { ...character.coin, gp: character.coin.gp - MEAL_PRICE },
@@ -394,7 +394,7 @@ export function TownView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [local.xp, local.activeRun]);
 
-  const hp = local.currentHp || maxHp(local).value;
+  const hp = hpOf(local);
 
   const run = local.activeRun as Run | undefined;
   const runQuest = run

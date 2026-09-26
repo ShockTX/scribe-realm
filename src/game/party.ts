@@ -7,7 +7,7 @@
  */
 import type { Character } from "../model/character";
 import { COMPANIONS, type Companion } from "../town/inn";
-import { maxHp, armorClass, modifiers } from "../rules/derive";
+import { maxHp, armorClass, modifiers, hpOf } from "../rules/derive";
 import { armorClassFrom, type Equipped } from "./gear";
 
 export interface SheetMember {
@@ -51,7 +51,7 @@ export function partyOf(c: Character): SheetMember[] {
     name: c.name,
     billing: heroBilling(c),
     kind: "hero",
-    hp: c.currentHp || full,
+    hp: hpOf(c),
     maxHp: full,
     ac,
     line: c.flaws || c.ideals || "Whatever happens next is yours to write.",

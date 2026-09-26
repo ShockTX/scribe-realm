@@ -10,6 +10,7 @@
 
 import type { Ability, Character } from "../model/character";
 import { modifiers, proficiencyBonus, skillBonus } from "../rules/derive";
+import { itemById } from "../town/shops";
 
 export type Outcome = "critical" | "success" | "partial" | "failure" | "fumble";
 
@@ -121,7 +122,7 @@ export function applyConsequence(
   maxHpValue: number,
   con: Consequence,
 ): Character {
-  const now = c.currentHp || maxHpValue;
+  const now = Math.max(0, Math.min(maxHpValue, c.currentHp ?? maxHpValue));
   const hp = Math.max(0, Math.min(maxHpValue, now + (con.hp ?? 0)));
   const gp = Math.max(0, c.coin.gp + (con.gp ?? 0));
   return {
@@ -146,7 +147,15 @@ export function readConsequence(raw: unknown, level: number): Consequence {
     out.gp = Math.max(-goldCap, Math.min(goldCap, Math.round(r.gp)));
   }
   if (Array.isArray(r.gain)) {
-    out.gain = r.gain.filter((x): x is string => typeof x === "string").slice(0, 3);
+    // Inventory is a clamped resource too. The Warden may hand over a thing
+    // that exists in a shop's catalogue; it may not conjure a "sunblade",
+    // which would sit in the pack unsellable, unequippable and unusable.
+    out.gain = r.gain
+      .filter((x): x is string => typeof x === "string")
+      .map((x) => x.trim())
+      .filter((x) => !!itemById(x))
+      .slice(0, 3);
+    if (!out.gain.length) delete out.gain;
   }
   if (typeof r.remember === "string" && r.remember.trim()) {
     out.remember = r.remember.trim().slice(0, 200);
