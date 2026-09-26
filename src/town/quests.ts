@@ -62,11 +62,43 @@ function asDanger(v: unknown): Danger {
   return v === "low" || v === "fair" || v === "grim" ? v : "fair";
 }
 
+/** How much a danger word is worth, as a multiple of the base purse. */
+export const REWARD_MULT: Record<Danger, number> = {
+  low: 0.7,
+  fair: 1,
+  grim: 1.5,
+};
+
+/**
+ * Coin per level, per job. The Warden used to name the purse itself at
+ * "10-25 gp per level", which could not pay a training fee and a potion in
+ * the same week, let alone the 300-750 gp gear at the top of the shops.
+ * The engine sizes the purse now; two won jobs buy a level and leave
+ * enough over to actually equip the character who earned it.
+ */
+export const BASE_PURSE = 60;
+
+export function rewardFor(level: number, danger: Danger): number {
+  const lv = Math.min(20, Math.max(1, Math.round(level) || 1));
+  return Math.round(BASE_PURSE * lv * REWARD_MULT[danger]);
+}
+
+/**
+ * The Warden may still argue about the purse, but only within a band around
+ * what the work is worth. Same proposer-inside-a-clamp shape as hp and gp:
+ * its judgement colours the number, it never sets it.
+ */
+export function readReward(raw: unknown, level: number, danger: Danger): number {
+  const want = rewardFor(level, danger);
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return want;
+  return Math.max(Math.round(want * 0.6), Math.min(Math.round(want * 1.6), Math.round(raw)));
+}
+
 /**
  * Turn whatever the service returned into a Quest, or throw.
  * Kept separate from the fetch so it can be tested without a network.
  */
-export function readQuest(raw: unknown, day: number): Quest {
+export function readQuest(raw: unknown, day: number, level = 1): Quest {
   if (!raw || typeof raw !== "object") throw new GmSilent("empty reply");
   const q = raw as Record<string, unknown>;
   const need = ["title", "giver", "where", "hook", "detail"] as const;
@@ -75,7 +107,7 @@ export function readQuest(raw: unknown, day: number): Quest {
       throw new GmSilent(`the posting had no ${f}`);
     }
   }
-  const reward = typeof q.reward === "number" ? Math.max(1, Math.round(q.reward)) : 10;
+  const reward = readReward(q.reward, level, asDanger(q.danger));
   return {
     id: slug(q.title as string, day),
     title: q.title as string,
@@ -122,7 +154,7 @@ export async function askForQuest(
         : `the board would not answer (${res.status})`,
     );
   }
-  return readQuest(await res.json(), seed.day);
+  return readQuest(await res.json(), seed.day, seed.level);
 }
 
 export async function gmAwake(): Promise<boolean> {
