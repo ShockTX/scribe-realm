@@ -122,11 +122,8 @@
   color: var(--gold); text-decoration: underline; }
 .link:disabled { opacity: .3; cursor: not-allowed; }
 
-.purse {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 10;
-  display: flex; gap: 1.25rem; align-items: center;
-  padding: .45rem 1.5rem; background: var(--parch-deep);
-  border-bottom: 1px solid var(--edge); font-size: .9rem;
-  font-family: "Iowan Old Style", Georgia, serif; color: var(--ink);
-}
-.purse span { color: var(--ink-soft); }
+/* The old creator-era .purse rule lived here and pinned the bar with
+   position:fixed. Nothing in the creator renders a .purse, but both
+   stylesheets load globally, so it leaked into the town and floated the
+   bar on top of the page title. The bar is styled in game/party.css;
+   it belongs in normal flow. Do not reintroduce a .purse rule here. */
