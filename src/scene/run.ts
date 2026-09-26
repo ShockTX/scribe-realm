@@ -282,13 +282,13 @@ export function dangerBase(danger: string): number {
 
 /**
  * What fraction of the gap to the next level a finished run is worth.
- * Flat fractions, not a hand-tuned table, so the curve stays the same
- * shape at level 2 and at level 12 and needs no upkeep.
+ * Centred on a half so two won runs make a level. Flat fractions, not a
+ * hand-tuned table, so the shape holds at level 2 and at level 12.
  */
 export const DANGER_SHARE: Record<string, number> = {
-  low: 0.15,
-  fair: 0.22,
-  grim: 0.3,
+  low: 0.4,
+  fair: 0.5,
+  grim: 0.6,
 };
 
 export function dangerShare(danger: string): number {
@@ -301,7 +301,9 @@ export function dangerShare(danger: string): number {
  * XP is a share of the distance to your next level, not danger x level.
  * The old formula paid 480 for a grim job at level 4 against a 6,500-xp
  * gap — four runs to level 2 and thirteen to level 5, which is exactly
- * backwards. This pays three to six runs per level at every level.
+ * backwards. A won run pays about half the gap, so every level costs
+ * roughly two runs at every level: grim closer to one and a half, low
+ * closer to two and a half.
  */
 export function settleRun(
   run: Run,

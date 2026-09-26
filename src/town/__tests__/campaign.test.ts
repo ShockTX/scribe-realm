@@ -95,14 +95,14 @@ describe("the XP curve holds its shape at every level", () => {
     }
   });
 
-  it("keeps runs-per-level between three and seven at every level", () => {
+  it("keeps every level about two runs", () => {
     for (let lv = 1; lv <= 15; lv++) {
       const gap = XP_THRESHOLDS[lv] - XP_THRESHOLDS[lv - 1];
       for (const danger of ["low", "fair", "grim"]) {
         const s = settleRun(wonRun(), 20, danger, lv);
         const runs = gap / s.xp;
-        expect(runs).toBeGreaterThanOrEqual(3);
-        expect(runs).toBeLessThanOrEqual(7);
+        expect(runs).toBeGreaterThanOrEqual(1.5);
+        expect(runs).toBeLessThanOrEqual(2.6);
       }
     }
   });
@@ -110,7 +110,7 @@ describe("the XP curve holds its shape at every level", () => {
   it("no longer needs thirteen identical errands for level five", () => {
     const gap = XP_THRESHOLDS[4] - XP_THRESHOLDS[3];
     const grim = settleRun(wonRun(), 20, "grim", 4);
-    expect(gap / grim.xp).toBeLessThan(7);
+    expect(gap / grim.xp).toBeLessThanOrEqual(2);
   });
 
   it("pays half for a costly ending and nothing for a lost one", () => {

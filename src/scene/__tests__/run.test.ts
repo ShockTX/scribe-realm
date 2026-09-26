@@ -126,17 +126,17 @@ describe("settlement", () => {
     expect(dangerBase("fair")).toBe(75);
     expect(dangerBase("grim")).toBe(120);
     // new curve: share of the gap to next level, not a flat base
-    expect(settleRun(won, 20, "grim", 1).xp).toBe(90);
+    expect(settleRun(won, 20, "grim", 1).xp).toBe(180);
     expect(settleRun(won, 20, "grim", 1).gold).toBe(20);
-    expect(settleRun(cost, 20, "fair", 1).xp).toBe(33);
+    expect(settleRun(cost, 20, "fair", 1).xp).toBe(75);
     expect(settleRun(cost, 20, "fair", 1).gold).toBe(10);
     expect(settleRun(lost, 20, "grim", 1).xp).toBe(0);
     expect(settleRun(lost, 20, "grim", 1).gold).toBe(0);
   });
 
   it("still understands the old danger words", () => {
-    expect(settleRun(won, 10, "hard", 1).xp).toBe(90);
-    expect(settleRun(won, 10, "risky", 1).xp).toBe(66);
+    expect(settleRun(won, 10, "hard", 1).xp).toBe(180);
+    expect(settleRun(won, 10, "risky", 1).xp).toBe(150);
   });
 });
 
