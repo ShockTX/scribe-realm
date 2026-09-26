@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Character } from "../model/character";
 import { totalLevel } from "../model/character";
 import { worldLedger, rememberFacts } from "../model/memory";
-import { applyLevels, type LevelNote } from "../rules/advance";
+import { type LevelNote } from "../rules/advance";
 import { LevelRise } from "../game/LevelRise";
 import { maxHp, hpOf } from "../rules/derive";
 import { COMPANIONS } from "../town/inn";
@@ -134,9 +134,15 @@ export function SceneView({
       },
       run.ledger,
     );
-    const risen = applyLevels(paidChar);
-    setRise(risen.notes);
-    setCharacter(risen.character);
+    // Levels are earned here but TAKEN at a trainer, for coin. That is what
+    // gives a level somewhere to be spent, and the town a reason to exist.
+    const counted = {
+      ...paidChar,
+      runsDone: (paidChar as typeof paidChar & { runsDone?: number }).runsDone ?? 0,
+    };
+    counted.runsDone = (counted.runsDone ?? 0) + 1;
+    setRise([]);
+    setCharacter(counted);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run.ending]);
 

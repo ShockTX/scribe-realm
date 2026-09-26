@@ -94,6 +94,8 @@ export interface Character {
   memory: string[];
   /** in-game day, advanced by sleeping at the inn */
   day: number;
+  /** runs finished; the second hand of the campaign clock */
+  runsDone: number;
   /** companion ids hired at the Salted Gull */
   companions: string[];
   /** the quest run currently being played, if any */
@@ -166,6 +168,7 @@ export function emptyCharacter(id = crypto.randomUUID()): Character {
     companionGear: {},
     memberNotes: {},
     day: 1,
+    runsDone: 0,
     companions: [],
     classes: [],
     skillProficiencies: [],

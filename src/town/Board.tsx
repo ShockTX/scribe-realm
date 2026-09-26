@@ -13,6 +13,7 @@ import {
 import { rumourOfTheDay } from "./inn";
 import { newRun } from "../scene/run";
 import { siteForQuest } from "../scene/sites";
+import { stageOf } from "./campaign";
 
 function seedFrom(c: Character): QuestSeed {
   return {
@@ -23,6 +24,10 @@ function seedFrom(c: Character): QuestSeed {
     day: c.day,
     gp: c.coin.gp,
     party: 1 + c.companions.length,
+    stage: stageOf(c).id,
+    stageName: stageOf(c).name,
+    situation: stageOf(c).situation,
+    leans: stageOf(c).leans,
   };
 }
 

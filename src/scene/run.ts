@@ -24,6 +24,7 @@ import {
   type Roll,
 } from "./dice";
 import type { Site } from "./sites";
+import { XP_THRESHOLDS } from "../rules/advance";
 
 export class GmSilent extends Error {}
 
@@ -279,7 +280,29 @@ export function dangerBase(danger: string): number {
   return 40;
 }
 
-/** XP is derived from the quest's danger and how the run ended. */
+/**
+ * What fraction of the gap to the next level a finished run is worth.
+ * Flat fractions, not a hand-tuned table, so the curve stays the same
+ * shape at level 2 and at level 12 and needs no upkeep.
+ */
+export const DANGER_SHARE: Record<string, number> = {
+  low: 0.15,
+  fair: 0.22,
+  grim: 0.3,
+};
+
+export function dangerShare(danger: string): number {
+  if (danger === "grim" || danger === "deadly" || danger === "hard") return DANGER_SHARE.grim;
+  if (danger === "fair" || danger === "risky") return DANGER_SHARE.fair;
+  return DANGER_SHARE.low;
+}
+
+/**
+ * XP is a share of the distance to your next level, not danger x level.
+ * The old formula paid 480 for a grim job at level 4 against a 6,500-xp
+ * gap — four runs to level 2 and thirteen to level 5, which is exactly
+ * backwards. This pays three to six runs per level at every level.
+ */
 export function settleRun(
   run: Run,
   questReward: number,
@@ -291,8 +314,12 @@ export function settleRun(
   }
   const share = run.ending === "won" ? 1 : 0.5;
   const gold = Math.max(1, Math.round(questReward * share));
-  const base = dangerBase(danger);
-  const xp = Math.max(10, Math.round(base * share * Math.max(1, level)));
+  const lv = Math.min(20, Math.max(1, level));
+  const here = XP_THRESHOLDS[lv - 1] ?? 0;
+  const next = XP_THRESHOLDS[lv] ?? null;
+  // At 20 there is no gap left; fall back to the last real gap so work still pays.
+  const gap = next == null ? (XP_THRESHOLDS[19] - XP_THRESHOLDS[18]) : next - here;
+  const xp = Math.max(10, Math.round(gap * dangerShare(danger) * share));
   const loot = run.loot ?? [];
   const lines = [
     `${gold} gp` + (run.ending === "cost" ? " — half, for half a job" : ""),

@@ -34,6 +34,11 @@ export interface QuestSeed {
   day: number;
   gp: number;
   party: number;
+  /** where the Salt Rise has got to, so the board escalates with the world */
+  stage?: string;
+  stageName?: string;
+  situation?: string;
+  leans?: Danger;
 }
 
 /** Where the GM lives. Same origin, so it inherits the site's password. */
@@ -99,6 +104,9 @@ export async function askForQuest(
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         character: seed,
+        stage: seed.stage,
+        situation: seed.situation,
+        leans: seed.leans,
         taken,
         rumour,
         memory: (memory ?? []).slice(-24),

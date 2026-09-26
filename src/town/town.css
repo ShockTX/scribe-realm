@@ -418,3 +418,26 @@ body { overflow: hidden; }
   font-size: 0.85rem;
   color: #6b5a44;
 }
+
+/* Counter services: heal, train, passage, appraisal. */
+.services {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.services__act {
+  flex: 1 1 auto;
+  padding: 0.55rem 0.9rem;
+  font: inherit;
+  text-align: left;
+  color: #e8dcc8;
+  background: rgba(24, 20, 16, 0.55);
+  border: 1px solid rgba(180, 150, 105, 0.35);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.services__act:hover {
+  background: rgba(40, 33, 25, 0.8);
+  border-color: rgba(214, 178, 120, 0.65);
+}

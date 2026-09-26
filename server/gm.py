@@ -151,6 +151,16 @@ def quest_prompt(payload):
         f"Day {c.get('day',1)} in town. Purse: {c.get('gp',0)} gp. "
         f"Party of {c.get('party',1)}.\n"
     )
+    situation = payload.get("situation")
+    if situation:
+        p += (
+            "\nTHE STATE OF THE REACH (" + str(payload.get("stage", "?")) + "):\n"
+            + str(situation)
+            + "\nThe posting must read as if this is true. Do not explain it; assume it.\n"
+        )
+    leans = payload.get("leans")
+    if leans in ("low", "fair", "grim"):
+        p += f"Work on the board at this stage tends to be: {leans}.\n"
     if taken:
         p += "Already taken (do not repeat): " + "; ".join(taken) + "\n"
     if payload.get("memory"):

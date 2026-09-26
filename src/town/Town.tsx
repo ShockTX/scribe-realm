@@ -7,14 +7,16 @@ import {
   TOWN_NAME,
   locationById,
   type TownLocation,
+  type ServiceKind,
 } from "./locations";
+import { townLine, stageOf } from "./campaign";
 import { stockFor, itemById, sellPrice, type ShopItem } from "./shops";
 import { Board } from "./Board";
 import { SceneView } from "../scene/SceneView";
 import type { Run } from "../scene/run";
 import { PartySheet } from "../game/PartySheet";
 import { LevelRise } from "../game/LevelRise";
-import { applyLevels, type LevelNote } from "../rules/advance";
+import { applyLevels, levelFromXp, type LevelNote } from "../rules/advance";
 import { rememberFacts } from "../model/memory";
 import { armorClassFrom } from "../game/gear";
 import { modifiers } from "../rules/derive";
@@ -24,6 +26,11 @@ import {
   companionOfTheDay,
   rumourOfTheDay,
 } from "./inn";
+
+/** Coin the trainer wants per level taken, scaled by how far you have come. */
+export const TRAIN_FEE = 25;
+/** A berth up the coast: coin, and a day of the Salt Rise getting worse. */
+export const PASSAGE_FEE = 10;
 
 /** The map, with every door on it clickable. */
 function TownMap({ onEnter }: { onEnter: (id: string) => void }) {
@@ -308,6 +315,78 @@ function Interior({
     setSaid(`${name} drains the cup, stands, and follows you out.`);
   };
 
+  const HEAL_PER_HP = 4;
+  const full = maxHp(character).value;
+  const hurt = Math.max(0, full - hpOf(character));
+
+  /** Pay for tending. Coin buys hit points, capped by what you can afford. */
+  const heal = () => {
+    const want = Math.min(hurt, Math.floor(character.coin.gp / HEAL_PER_HP));
+    if (hurt <= 0) return setSaid("You are whole. Save your coin.");
+    if (want <= 0) return setSaid("Tending costs coin, and you have none to spare.");
+    setCharacter({
+      ...character,
+      coin: { ...character.coin, gp: character.coin.gp - want * HEAL_PER_HP },
+      currentHp: hpOf(character) + want,
+    });
+    setSaid(`Salt, thread and a poultice. ${want} hit point${want > 1 ? "s" : ""} back, for ${want * HEAL_PER_HP} gp.`);
+  };
+
+  /** Training is where earned levels are actually taken, and paid for. */
+  const owed = levelFromXp(character.xp ?? 0) - (totalLevel(character) || 1);
+  const trainFee = TRAIN_FEE * Math.max(1, totalLevel(character) || 1);
+  const train = () => {
+    if (owed <= 0) {
+      return setSaid("There is nothing here you have not already learned. Come back with more behind you.");
+    }
+    if (character.coin.gp < trainFee) {
+      return setSaid(`The work is yours when you can pay for it — ${trainFee} gp.`);
+    }
+    const paid = { ...character, coin: { ...character.coin, gp: character.coin.gp - trainFee } };
+    const { character: raised, notes } = applyLevels(paid);
+    setCharacter(raised);
+    const top = notes[notes.length - 1];
+    setSaid(
+      top
+        ? `Days of it, and it takes. Level ${top.level}. ${trainFee} gp.`
+        : `Level taken. ${trainFee} gp.`,
+    );
+  };
+
+  /** Passage costs a day, which is what gives the Salt Rise its teeth. */
+  const travel = () => {
+    if (character.coin.gp < PASSAGE_FEE) {
+      return setSaid(`Passage is ${PASSAGE_FEE} gp, and nobody sails on credit.`);
+    }
+    setCharacter({
+      ...character,
+      coin: { ...character.coin, gp: character.coin.gp - PASSAGE_FEE },
+      day: character.day + 1,
+    });
+    setSaid("You take the coast and come back on the evening tide. A day gone, and the water higher than it was.");
+  };
+
+  /** Honest stub: there is nothing to identify until loot stops being shop stock. */
+  const identify = () => {
+    const odd = character.pack.filter((id) => !itemById(id));
+    setSaid(
+      odd.length
+        ? `${odd.length} thing${odd.length > 1 ? "s" : ""} on the counter that nobody here can name. Leave ${odd.length > 1 ? "them" : "it"} a while.`
+        : "She turns each piece over and hands it back. Good steel, honest rope, nothing with a story in it.",
+    );
+  };
+
+  const stageLine = townLine(loc.id, character);
+  const doService = (kind: ServiceKind) => {
+    if (kind === "heal") return heal();
+    if (kind === "train") return train();
+    if (kind === "travel") return travel();
+    if (kind === "identify") return identify();
+  };
+  const extras = loc.services.filter(
+    (s) => s.kind === "heal" || s.kind === "train" || s.kind === "travel" || s.kind === "identify",
+  );
+
   return (
     <div className="town">
       <header className="town__head">
@@ -325,7 +404,7 @@ function Interior({
             )}
           </div>
           <p className={said ? "scene__text scene__text--said" : "scene__text"}>
-            {said ?? loc.description}
+            {said ?? stageLine ?? loc.description}
           </p>
         </div>
 
@@ -351,6 +430,22 @@ function Interior({
               There is nothing for sale here — only talk, and not much of that
               yet.
             </p>
+          </div>
+        )}
+        {extras.length > 0 && (
+          <div className="services">
+            {extras.map((sv) => (
+              <button
+                key={sv.kind}
+                className="services__act"
+                onClick={() => doService(sv.kind)}
+              >
+                {sv.label}
+                {sv.kind === "train" && owed > 0 ? ` (${trainFee} gp)` : ""}
+                {sv.kind === "heal" && hurt > 0 ? ` (${HEAL_PER_HP} gp a point)` : ""}
+                {sv.kind === "travel" ? ` (${PASSAGE_FEE} gp, a day)` : ""}
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -425,7 +520,7 @@ export function TownView({
           {local.name}
         </button>
         <span>Level {totalLevel(local) || 1}</span>
-        <span>Day {local.day}</span>
+        <span>Day {local.day} · {stageOf(local).name}</span>
         <span>
           HP {hp}/{maxHp(local).value}
         </span>
