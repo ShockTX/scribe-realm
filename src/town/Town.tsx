@@ -16,7 +16,7 @@ import { SceneView } from "../scene/SceneView";
 import type { Run } from "../scene/run";
 import { PartySheet } from "../game/PartySheet";
 import { LevelRise } from "../game/LevelRise";
-import { applyLevels, levelFromXp, type LevelNote } from "../rules/advance";
+import { applyLevels, levelFromXp, xpToNext, type LevelNote } from "../rules/advance";
 import { rememberFacts } from "../model/memory";
 import { armorClassFrom } from "../game/gear";
 import { modifiers } from "../rules/derive";
@@ -520,6 +520,17 @@ export function TownView({
           {local.name}
         </button>
         <span>Level {totalLevel(local) || 1}</span>
+        <span title="Experience, and what the next level asks for">
+          XP {local.xp ?? 0}
+          {xpToNext(totalLevel(local) || 1) != null
+            ? ` / ${xpToNext(totalLevel(local) || 1)}`
+            : ""}
+        </span>
+        {levelFromXp(local.xp ?? 0) > (totalLevel(local) || 1) && (
+          <span className="purse__owed" title="Earned. Pay the trainer at the yard to take it.">
+            Level earned — train
+          </span>
+        )}
         <span>Day {local.day} · {stageOf(local).name}</span>
         <span>
           HP {hp}/{maxHp(local).value}

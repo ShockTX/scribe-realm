@@ -464,3 +464,15 @@
 
 .rise--sheet .rise__line { color: #3a2614; }
 
+
+/* Experience is the one number a player checks constantly; the bar hid it
+   entirely until now. The "earned" flag is deliberately loud, because a
+   level you have paid nothing for is easy to walk past. */
+.purse__owed {
+  color: #1c1208;
+  background: #d8a54a;
+  border-radius: 0.2rem;
+  padding: 0 0.4rem;
+  font-weight: 600;
+  opacity: 1 !important;
+}
