@@ -31,10 +31,10 @@ describe("the Warden may not conjure items", () => {
     expect(con.gain).toEqual(["rope-50"]);
   });
 
-  it("still clamps gold and hit points as before", () => {
+  it("clamps gold and hit points to the beat ceiling", () => {
     const con = readConsequence({ hp: -9999, gp: 9999 }, 1);
     expect(con.hp).toBe(-7);
-    expect(con.gp).toBe(25);
+    expect(con.gp).toBe(100);
   });
 });
 

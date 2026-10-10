@@ -9,7 +9,9 @@ import {
   dangerBase,
   newRun,
   readScene,
+  applySettlement,
   settleRun,
+  type Run,
   type SceneSeed,
 } from "../run";
 
@@ -46,6 +48,53 @@ function seed(level: number): SceneSeed {
   };
 }
 
+describe("settlement pays once", () => {
+  function openQuest(state: "taken" | "done" = "taken") {
+    const c = hero();
+    c.quests = [
+      {
+        id: "bell",
+        title: "A bell",
+        giver: "Enna",
+        where: "the wood",
+        hook: "Find it.",
+        detail: "A bell in the wood.",
+        reward: 240,
+        danger: "fair",
+        posted: 1,
+        state,
+      },
+    ];
+    const run = newRun("bell", SITES[0]);
+    run.ending = "won";
+    return { c, run };
+  }
+
+  it("adds the purse once and ignores a second pass", () => {
+    const { c, run } = openQuest();
+    const first = applySettlement(c, run, { id: "bell", reward: 240, danger: "fair" });
+    expect(first.settlement.gold).toBe(240);
+    expect(first.character.coin.gp).toBe(c.coin.gp + 240);
+    expect(first.character.quests.find((q) => q.id === "bell")?.state).toBe("done");
+    expect((first.character.activeRun as Run).payout).toBe(240);
+    const again = applySettlement(
+      first.character,
+      first.character.activeRun as Run,
+      { id: "bell", reward: 240, danger: "fair" },
+    );
+    expect(again.character.coin.gp).toBe(first.character.coin.gp);
+    expect(again.character.xp).toBe(first.character.xp);
+  });
+
+  it("does not pay a quest the save already marked done", () => {
+    const { c, run } = openQuest("done");
+    const result = applySettlement(c, run, { id: "bell", reward: 240, danger: "fair" });
+    expect(result.character.coin.gp).toBe(c.coin.gp);
+    expect(result.character.xp).toBe(c.xp);
+    expect((result.character.activeRun as Run).payout).toBe(result.settlement.gold);
+  });
+});
+
 describe("reading a scene", () => {
   it("clamps a vicious consequence to the level it was given", () => {
     const low = readScene(
@@ -53,7 +102,7 @@ describe("reading a scene", () => {
       1,
     );
     expect(low.onSuccess?.consequence?.hp).toBe(-(4 + 3));
-    expect(low.onSuccess?.consequence?.gp).toBe(25);
+    expect(low.onSuccess?.consequence?.gp).toBe(100);
 
     const mid = readScene(
       { situation: "Steel.", onSuccess: { text: "It lands.", consequence: { hp: -999 } } },

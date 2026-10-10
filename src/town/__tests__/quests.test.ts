@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readQuest, GmSilent, completeReward, DANGER_WORD } from "../quests";
+import { readQuest, GmSilent, completeReward, DANGER_WORD, rewardFor } from "../quests";
 
 const good = {
   title: "The Bell That Rings Itself",
@@ -15,7 +15,9 @@ describe("reading what the GM sends back", () => {
   it("turns a good reply into a quest", () => {
     const q = readQuest(good, 4);
     expect(q.title).toBe(good.title);
-    expect(q.reward).toBe(36); // engine floor, not the Warden's 18
+    const floor = Math.round(rewardFor(1, "fair") * 0.6);
+    expect(q.reward).toBe(floor); // engine floor, not the Warden's 18
+    expect(floor).toBeGreaterThan(good.reward);
     expect(q.danger).toBe("fair");
     expect(q.posted).toBe(4);
     expect(q.state).toBe("offered");
@@ -46,7 +48,7 @@ describe("reading what the GM sends back", () => {
 
   it("pays out exactly what was posted", () => {
     const q = readQuest(good, 1);
-    expect(completeReward(q)).toBe(36);
+    expect(completeReward(q)).toBe(q.reward);
   });
 
   it("has a plain word for every danger level", () => {

@@ -202,7 +202,7 @@ export const LOCATIONS: TownLocation[] = [
       "She sits at the long pier with her sails furled and her deck swept, which in this harbour marks her out as either very well run or very recently bought. Fenn is aboard. Fenn is always aboard.",
     art: "/art/town/ship.jpg",
     services: [
-      { kind: "travel", label: "Ask where she is bound" },
+      { kind: "travel", label: "Take the day along the coast" },
       { kind: "quests", label: "Speak with Captain Fenn" },
     ],
     hotspot: { left: 52, top: 68, width: 17, height: 28 },
@@ -211,4 +211,29 @@ export const LOCATIONS: TownLocation[] = [
 
 export function locationById(id: string): TownLocation | undefined {
   return LOCATIONS.find((l) => l.id === id);
+}
+
+/** Which counters a building actually shows. A quest sign is a board. */
+export function placePanels(
+  loc: TownLocation,
+  stockCount: number,
+): { board: boolean; inn: boolean; shop: boolean } {
+  return {
+    board: loc.services.some((s) => s.kind === "quests"),
+    inn: loc.id === "tavern",
+    shop: stockCount > 0,
+  };
+}
+
+const POSTED: Record<string, (title: string) => string> = {
+  guildhall: (t) => `The clerk pins up a new bill: ${t}.`,
+  tavern: (t) => `Someone at the bar has work: ${t}.`,
+  temple: (t) => `Sister Calloway sets a notice by the candles: ${t}.`,
+  harbormaster: (t) => `Coll adds a line to the day's list: ${t}.`,
+  ship: (t) => `Fenn has a job, if you want it: ${t}.`,
+};
+
+/** What is said when a new bill goes up. Unknown places use the clerk. */
+export function postedLine(placeId: string, title: string): string {
+  return (POSTED[placeId] ?? POSTED.guildhall)(title);
 }

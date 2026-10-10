@@ -75,7 +75,7 @@ export const SITES: Site[] = [
     description:
       "A whole fortress drowned inside a cavern, its halls still standing in water the colour of bottle glass. Causeways run between barracks and vaults; a broken bridge hangs over the deep. Somebody sealed the Royal Vault from the inside, and the Warden's Tower still has a light in it.",
     rooms: [
-      { id: "gate", name: "Moonfall Gate", note: "the way in, a arched gatehouse above the waterline" },
+      { id: "gate", name: "Moonfall Gate", note: "the way in, an arched gatehouse above the waterline" },
       { id: "echoes", name: "The Hall of Echoes", note: "a pillared hall where every footfall is answered twice" },
       { id: "crypts", name: "The Flooded Crypts", note: "chest-deep water over broken sarcophagi" },
       { id: "bridge", name: "The Broken Bridge", note: "a span with the middle gone, ropes still hanging" },
@@ -124,7 +124,11 @@ export function siteForQuest(where: string, title: string): Site {
   if (/(citadel|crypt|tomb|barrow|royal vault)/.test(hay)) {
     return siteById("deep-vault") ?? SITES[2];
   }
-  if (/(shrine|crystal|undercroft|drowned town|sunken)/.test(hay)) {
+  if (
+    /(crystal|undercroft|drowned town|glimmering|below the shrine|beneath the shrine|sunken stair|sunken steps)/.test(
+      hay,
+    )
+  ) {
     return siteById("crystal-cavern") ?? SITES[1];
   }
   if (/(headland|drowned crown|causeway)/.test(hay)) {

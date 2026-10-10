@@ -70,13 +70,12 @@ export const REWARD_MULT: Record<Danger, number> = {
 };
 
 /**
- * Coin per level, per job. The Warden used to name the purse itself at
- * "10-25 gp per level", which could not pay a training fee and a potion in
- * the same week, let alone the 300-750 gp gear at the top of the shops.
- * The engine sizes the purse now; two won jobs buy a level and leave
- * enough over to actually equip the character who earned it.
+ * Coin per level, per job. 60 gp bought a potion and nothing else, so a
+ * breastplate was a week of work. One fair job now covers a weapon and
+ * armour of the ordinary sort, and two buy the 400 gp breastplate.
+ * The engine sizes the purse; the Warden only colours it.
  */
-export const BASE_PURSE = 60;
+export const BASE_PURSE = 240;
 
 export function rewardFor(level: number, danger: Danger): number {
   const lv = Math.min(20, Math.max(1, Math.round(level) || 1));

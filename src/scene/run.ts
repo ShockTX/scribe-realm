@@ -12,6 +12,7 @@
 
 import type { Ability, Character } from "../model/character";
 import { totalLevel } from "../model/character";
+import { rememberFacts } from "../model/memory";
 import { maxHp } from "../rules/derive";
 import { foeCeiling } from "./foes";
 import {
@@ -329,4 +330,42 @@ export function settleRun(
   ];
   if (loot.length) lines.push(`${loot.length} thing${loot.length > 1 ? "s" : ""} carried out`);
   return { gold, xp, loot, lines };
+}
+
+/**
+ * Apply a finished run to a character. `run.payout` means this ending was
+ * already paid, including a loss whose payout is 0. A quest already marked
+ * done gets the marker written and the purse left alone, so a reload of an
+ * older save does not pay a second time.
+ */
+export function applySettlement(
+  character: Character,
+  run: Run,
+  quest: { id: string; reward: number; danger: string },
+): { character: Character; settlement: Settlement } {
+  const settlement = settleRun(run, quest.reward, quest.danger, totalLevel(character) || 1);
+  if (!run.ending || typeof run.payout === "number") {
+    return { character, settlement };
+  }
+  const quests = character.quests ?? [];
+  const row = quests.find((q) => q.id === quest.id);
+  const paidRun: Run = { ...run, payout: settlement.gold };
+  if (row?.state === "done") {
+    return { character: { ...character, activeRun: paidRun }, settlement };
+  }
+  const paid = rememberFacts(
+    {
+      ...character,
+      xp: (character.xp ?? 0) + settlement.xp,
+      coin: { ...character.coin, gp: character.coin.gp + settlement.gold },
+      pack: [...character.pack, ...settlement.loot],
+      quests: quests.map((q) => (q.id === quest.id ? { ...q, state: "done" as const } : q)),
+      activeRun: paidRun,
+    },
+    run.ledger,
+  );
+  return {
+    settlement,
+    character: { ...paid, runsDone: (paid.runsDone ?? 0) + 1 },
+  };
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { LOCATIONS, locationById } from "../locations";
+import { LOCATIONS, locationById, placePanels, postedLine } from "../locations";
+import { stockFor } from "../shops";
 
 describe("Saltmarrow Reach", () => {
   it("has a worthwhile number of places to visit", () => {
@@ -67,5 +68,29 @@ describe("Saltmarrow Reach", () => {
   it("finds a location by id", () => {
     expect(locationById("weaponsmith")?.name).toBe("The Hammer & Tide");
     expect(locationById("nowhere")).toBeUndefined();
+  });
+
+  it("opens a board wherever work is offered", () => {
+    const panels = (id: string) => {
+      const loc = LOCATIONS.find((l) => l.id === id)!;
+      return placePanels(loc, stockFor(id).length);
+    };
+    expect(panels("guildhall")).toEqual({ board: true, inn: false, shop: false });
+    expect(panels("tavern")).toEqual({ board: true, inn: true, shop: false });
+    expect(panels("temple")).toEqual({ board: true, inn: false, shop: true });
+    expect(panels("harbormaster")).toMatchObject({ board: true, inn: false, shop: false });
+    expect(panels("ship")).toMatchObject({ board: true, shop: false });
+    expect(panels("weaponsmith")).toEqual({ board: false, inn: false, shop: true });
+    expect(panels("general-store").shop).toBe(true);
+    expect(panels("wharf-market").shop).toBe(true);
+  });
+
+  it("speaks in the voice of the place that posted the bill", () => {
+    expect(postedLine("guildhall", "The Salt Door")).toBe("The clerk pins up a new bill: The Salt Door.");
+    expect(postedLine("tavern", "The Salt Door")).toContain("bar");
+    expect(postedLine("temple", "The Salt Door")).toContain("Calloway");
+    expect(postedLine("harbormaster", "The Salt Door")).toContain("Coll");
+    expect(postedLine("ship", "The Salt Door")).toContain("Fenn");
+    expect(postedLine("nowhere", "The Salt Door")).toBe(postedLine("guildhall", "The Salt Door"));
   });
 });

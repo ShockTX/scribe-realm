@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { STOCK, ALL_ITEMS, sellPrice, itemById, stockFor } from "../shops";
+import { STOCK, ALL_ITEMS, sellPrice, itemById, stockFor, identifyPack } from "../shops";
 import { COMPANIONS, companionOfTheDay, rumourOfTheDay } from "../inn";
 import { emptyCharacter } from "../../model/character";
 import { LOCATIONS } from "../locations";
@@ -47,6 +47,27 @@ describe("selling", () => {
     for (const item of ALL_ITEMS) {
       expect(itemById(item.id)).toBeDefined();
     }
+  });
+});
+
+describe("identify", () => {
+  it("names strange catalog items and skips ordinary gear", () => {
+    const said = identifyPack(["dagger", "bag-holding"]);
+    expect(said).toContain("Bag of holding");
+    expect(said).not.toContain("nothing with a story");
+    expect(said).not.toContain("Dagger");
+  });
+
+  it("says ordinary gear has no story", () => {
+    expect(identifyPack(["rope-50"])).toContain("nothing with a story");
+  });
+
+  it("admits what nobody can name", () => {
+    expect(identifyPack(["not-a-real-id"])).toContain("nobody here can name");
+  });
+
+  it("names a potion", () => {
+    expect(identifyPack(["potion-healing"])).toContain("Potion of healing");
   });
 });
 

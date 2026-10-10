@@ -53,4 +53,16 @@ describe("the wilds", () => {
     expect(siteForQuest("below the shrine", "The sunken stair").id).toBe("crystal-cavern");
     expect(siteForQuest("the tomb inland", "The royal vault").id).toBe("deep-vault");
   });
+
+  it("does not send town talk into the undercroft", () => {
+    expect(siteForQuest("the Drowned Shrine", "Speak with Sister Calloway").id).toBe("wilds");
+    expect(siteForQuest("the Salted Gull", "Talk in the harbour").id).toBe("wilds");
+  });
+
+  it("names the gatehouse with the right article", () => {
+    const vault = SITES.find((s) => s.id === "deep-vault")!;
+    const gate = vault.rooms.find((r) => r.id === "gate")!;
+    expect(gate.note).toContain("an arched");
+    expect(gate.note).not.toContain("a arched");
+  });
 });

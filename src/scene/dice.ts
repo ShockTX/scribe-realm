@@ -138,7 +138,8 @@ export function readConsequence(raw: unknown, level: number): Consequence {
   if (!raw || typeof raw !== "object") return {};
   const r = raw as Record<string, unknown>;
   const cap = 4 + level * 3; // a single beat can never gut a character
-  const goldCap = 25 * level;
+  // About two-fifths of a fair job, so a beat can pay for gear.
+  const goldCap = 100 * level;
   const out: Consequence = {};
   if (typeof r.hp === "number" && Number.isFinite(r.hp)) {
     out.hp = Math.max(-cap, Math.min(cap, Math.round(r.hp)));

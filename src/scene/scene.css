@@ -285,6 +285,14 @@ form.run__type {
   color: var(--ink);
 }
 
+/* A mapped site is the way you travel, so it stays on screen.
+   This rule has to come before the wide-screen override, or 48vh wins. */
+.run__stage.run__stage--map {
+  display: block;
+  overflow: auto;
+  max-height: 48vh;
+}
+
 @media (min-width: 900px) {
   .run__body {
     grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
@@ -297,13 +305,6 @@ form.run__type {
     max-height: none;
     height: 100%;
   }
-}
-
-/* A mapped site is the way you travel, so it stays on screen. */
-.run__stage.run__stage--map {
-  display: block;
-  overflow: auto;
-  max-height: 48vh;
 }
 
 .run__stage--map .map {

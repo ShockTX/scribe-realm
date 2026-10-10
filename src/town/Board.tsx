@@ -14,6 +14,7 @@ import { rumourOfTheDay } from "./inn";
 import { newRun } from "../scene/run";
 import { siteForQuest } from "../scene/sites";
 import { stageOf } from "./campaign";
+import { postedLine } from "./locations";
 
 function seedFrom(c: Character): QuestSeed {
   return {
@@ -36,11 +37,16 @@ export function Board({
   setCharacter,
   say,
   onVenture,
+  autoAsk = false,
+  placeId,
 }: {
   character: Character;
   setCharacter: (c: Character) => void;
   say: (s: string) => void;
   onVenture: () => void;
+  /** Only the Register asks for a bill the moment you walk in. */
+  autoAsk?: boolean;
+  placeId: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [trouble, setTrouble] = useState<string | null>(null);
@@ -49,7 +55,7 @@ export function Board({
 
   // An empty board on arrival asks for one posting, once.
   useEffect(() => {
-    if (quests.length === 0) void post();
+    if (autoAsk && quests.length === 0) void post();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -65,7 +71,7 @@ export function Board({
         character.memory,
       );
       setCharacter({ ...character, quests: [...quests, q] });
-      say(`The clerk pins up a new bill: ${q.title}.`);
+      say(postedLine(placeId, q.title));
     } catch (e) {
       setTrouble(
         e instanceof GmSilent ? e.message : "the board would not answer",
@@ -97,7 +103,7 @@ export function Board({
       <div className="counter__tabs">
         <span className="tab tab--on">The board</span>
         <button className="tab" onClick={post} disabled={busy}>
-          {busy ? "The clerk is writing…" : "Ask for new work"}
+          {busy ? "Writing a bill…" : "Ask for new work"}
         </button>
       </div>
 

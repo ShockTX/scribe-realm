@@ -28,7 +28,15 @@ describe("the purse", () => {
     }
   });
 
+  it("makes a fair job buy real gear", () => {
+    // One level-1 fair job covers a 50 gp potion and a 50 gp chain shirt
+    // and still beats the old 60 gp purse. Two of them buy a 400 gp breastplate.
+    expect(rewardFor(1, "fair")).toBeGreaterThanOrEqual(200);
+    expect(rewardFor(1, "fair") * 2).toBeGreaterThanOrEqual(400);
+  });
+
   it("sizes the posting off the character, not the reply", () => {
-    expect(readQuest(good, 1, 5).reward).toBe(180); // floor of the level-5 fair band, not the reply's 12
+    const floor = Math.round(rewardFor(5, "fair") * 0.6);
+    expect(readQuest(good, 1, 5).reward).toBe(floor);
   });
 });

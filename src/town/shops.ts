@@ -167,3 +167,37 @@ export const ALL_ITEMS: ShopItem[] = Object.values(STOCK).flat();
 export function itemById(id: string): ShopItem | undefined {
   return ALL_ITEMS.find((i) => i.id === id);
 }
+
+const STRANGE = new Set<Wares>(["arcana", "scroll", "potion"]);
+
+/**
+ * What Ospreth says over the counter. Strange shop goods are named.
+ * Ordinary steel is not. Anything the catalog has never seen stays unnamed.
+ */
+export function identifyPack(pack: string[]): string {
+  const seen = new Set<string>();
+  const strange: ShopItem[] = [];
+  const unknown: string[] = [];
+  for (const id of pack) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const item = itemById(id);
+    if (!item) unknown.push(id);
+    else if (STRANGE.has(item.kind)) strange.push(item);
+  }
+  const parts: string[] = [];
+  if (strange.length) {
+    parts.push(strange.map((i) => `${i.name}. ${i.note}`).join(" "));
+  } else if (!unknown.length) {
+    parts.push(
+      "She turns each piece over and hands it back. Good steel, honest rope, nothing with a story in it.",
+    );
+  }
+  if (unknown.length) {
+    const n = unknown.length;
+    parts.push(
+      `${n} thing${n > 1 ? "s" : ""} on the counter that nobody here can name. Leave ${n > 1 ? "them" : "it"} a while.`,
+    );
+  }
+  return parts.join(" ");
+}

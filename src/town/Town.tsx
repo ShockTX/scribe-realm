@@ -6,11 +6,12 @@ import {
   TOWN_MAP_ART,
   TOWN_NAME,
   locationById,
+  placePanels,
   type TownLocation,
   type ServiceKind,
 } from "./locations";
 import { townLine, stageOf } from "./campaign";
-import { stockFor, itemById, sellPrice, type ShopItem } from "./shops";
+import { stockFor, itemById, sellPrice, identifyPack, type ShopItem } from "./shops";
 import { Board } from "./Board";
 import { SceneView } from "../scene/SceneView";
 import type { Run } from "../scene/run";
@@ -31,6 +32,23 @@ import {
 export const TRAIN_FEE = 25;
 /** A berth up the coast: coin, and a day of the Salt Rise getting worse. */
 export const PASSAGE_FEE = 10;
+
+/** Same coastal day for every captain. Too poor, and the character is unchanged. */
+export function afterPassage(character: Character): Character {
+  if (character.coin.gp < PASSAGE_FEE) return character;
+  return {
+    ...character,
+    coin: { ...character.coin, gp: character.coin.gp - PASSAGE_FEE },
+    day: character.day + 1,
+  };
+}
+
+export function passageLine(locationId: string): string {
+  if (locationId === "ship") {
+    return "Fenn takes you up the coast and back before dark. A day gone, and the water higher than it was.";
+  }
+  return "You take the coast and come back on the evening tide. A day gone, and the water higher than it was.";
+}
 
 /** The map, with every door on it clickable. */
 function TownMap({ onEnter }: { onEnter: (id: string) => void }) {
@@ -258,8 +276,7 @@ function Interior({
 }) {
   const [said, setSaid] = useState<string | null>(null);
   const stock = stockFor(loc.id);
-  const isInn = loc.id === "tavern";
-  const isBoard = loc.id === "guildhall";
+  const panels = placePanels(loc, stock.length);
 
   const buy = (item: ShopItem) => {
     setCharacter({
@@ -355,25 +372,16 @@ function Interior({
 
   /** Passage costs a day, which is what gives the Salt Rise its teeth. */
   const travel = () => {
-    if (character.coin.gp < PASSAGE_FEE) {
+    const next = afterPassage(character);
+    if (next === character) {
       return setSaid(`Passage is ${PASSAGE_FEE} gp, and nobody sails on credit.`);
     }
-    setCharacter({
-      ...character,
-      coin: { ...character.coin, gp: character.coin.gp - PASSAGE_FEE },
-      day: character.day + 1,
-    });
-    setSaid("You take the coast and come back on the evening tide. A day gone, and the water higher than it was.");
+    setCharacter(next);
+    setSaid(passageLine(loc.id));
   };
 
-  /** Honest stub: there is nothing to identify until loot stops being shop stock. */
   const identify = () => {
-    const odd = character.pack.filter((id) => !itemById(id));
-    setSaid(
-      odd.length
-        ? `${odd.length} thing${odd.length > 1 ? "s" : ""} on the counter that nobody here can name. Leave ${odd.length > 1 ? "them" : "it"} a while.`
-        : "She turns each piece over and hands it back. Good steel, honest rope, nothing with a story in it.",
-    );
+    setSaid(identifyPack(character.pack));
   };
 
   const stageLine = townLine(loc.id, character);
@@ -408,23 +416,33 @@ function Interior({
           </p>
         </div>
 
-        {isBoard ? (
-          <Board character={character} setCharacter={setCharacter} say={setSaid} onVenture={onVenture} />
-        ) : isInn ? (
-          <InnCounter
-            character={character}
-            onRest={rest}
-            onHire={hire}
-            onMeal={meal}
-          />
-        ) : stock.length > 0 ? (
+        {panels.shop && (
           <Counter
             stock={stock}
             character={character}
             onBuy={buy}
             onSell={sell}
           />
-        ) : (
+        )}
+        {panels.inn && (
+          <InnCounter
+            character={character}
+            onRest={rest}
+            onHire={hire}
+            onMeal={meal}
+          />
+        )}
+        {panels.board && (
+          <Board
+            character={character}
+            setCharacter={setCharacter}
+            say={setSaid}
+            onVenture={onVenture}
+            autoAsk={loc.id === "guildhall"}
+            placeId={loc.id}
+          />
+        )}
+        {!panels.shop && !panels.inn && !panels.board && (
           <div className="counter">
             <p className="counter__empty">
               There is nothing for sale here — only talk, and not much of that
@@ -472,7 +490,8 @@ export function TownView({
   localRef.current = local;
   const loc = where ? locationById(where) : undefined;
 
-  const update = (c: Character) => {
+  const update = (next: Character | ((prev: Character) => Character)) => {
+    const c = typeof next === "function" ? next(localRef.current) : next;
     localRef.current = c;
     setLocal(c);
     onChange?.(c);

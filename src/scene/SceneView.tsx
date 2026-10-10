@@ -21,7 +21,7 @@ import {
   beatLine,
   GmSilent,
   newRun,
-  settleRun,
+  applySettlement,
   type Beat,
   type Run,
   type SceneReply,
@@ -98,7 +98,7 @@ export function SceneView({
   onLeave,
 }: {
   character: Character;
-  setCharacter: (c: Character) => void;
+  setCharacter: (next: Character | ((prev: Character) => Character)) => void;
   quest: Quest;
   run: Run;
   setRun: (r: Run) => void;
@@ -115,34 +115,18 @@ export function SceneView({
   const [rise, setRise] = useState<LevelNote[]>([]);
   const opened = useRef(false);
   const foughtBeat = useRef<number | null>(null);
-  // Settlement: the only place a finished run pays out. Runs once.
-  const settled = useRef(false);
+  // Settlement: the only place a finished run pays out. `run.payout` keeps
+  // a reload from paying the same ending again.
   useEffect(() => {
-    if (!run.ending || settled.current) return;
-    settled.current = true;
-    const s = settleRun(run, quest.reward, quest.danger, totalLevel(character) || 1);
-    setPaid(s);
-    const paidChar = rememberFacts(
-      {
-        ...character,
-        xp: (character.xp ?? 0) + s.xp,
-        coin: { ...character.coin, gp: character.coin.gp + s.gold },
-        pack: [...character.pack, ...s.loot],
-        quests: (character.quests ?? []).map((q) =>
-          q.id === quest.id ? { ...q, state: "done" as const } : q,
-        ),
-      },
-      run.ledger,
-    );
-    // Levels are earned here but TAKEN at a trainer, for coin. That is what
-    // gives a level somewhere to be spent, and the town a reason to exist.
-    const counted = {
-      ...paidChar,
-      runsDone: (paidChar as typeof paidChar & { runsDone?: number }).runsDone ?? 0,
-    };
-    counted.runsDone = (counted.runsDone ?? 0) + 1;
+    if (!run.ending) return;
+    let settlement: Settlement | null = null;
+    setCharacter((prev) => {
+      const result = applySettlement(prev, run, quest);
+      settlement = result.settlement;
+      return result.character;
+    });
+    if (settlement) setPaid(settlement);
     setRise([]);
-    setCharacter(counted);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run.ending]);
 
