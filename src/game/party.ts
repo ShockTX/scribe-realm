@@ -10,6 +10,12 @@ import { COMPANIONS, type Companion } from "../town/inn";
 import { maxHp, armorClass, modifiers, hpOf } from "../rules/derive";
 import { armorClassFrom, type Equipped } from "./gear";
 
+/** The AC a blow is rolled against: worn armour, or a hand-set override. */
+export function heroArmorClass(c: Character): number {
+  if (c.overrides?.armorClass) return armorClass(c).value;
+  return armorClassFrom((c.equipped ?? {}) as Equipped, modifiers(c).dex).value;
+}
+
 export interface SheetMember {
   key: string;
   name: string;
@@ -40,10 +46,8 @@ export function heroBilling(c: Character): string {
 }
 
 export function partyOf(c: Character): SheetMember[] {
-  const dex = modifiers(c).dex;
   const equipped = (c.equipped ?? {}) as Equipped;
-  const overridden = c.overrides?.armorClass;
-  const ac = overridden ? armorClass(c).value : armorClassFrom(equipped, dex).value;
+  const ac = heroArmorClass(c);
   const full = maxHp(c).value;
 
   const hero: SheetMember = {

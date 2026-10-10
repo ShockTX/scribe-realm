@@ -9,7 +9,8 @@
  */
 
 import type { Ability, Character } from "../model/character";
-import { modifiers, proficiencyBonus, skillBonus } from "../rules/derive";
+import { finalScores, modifiers, proficiencyBonus, skillBonus } from "../rules/derive";
+import { ARMOR } from "../game/gear";
 import { itemById } from "../town/shops";
 
 export type Outcome = "critical" | "success" | "partial" | "failure" | "fumble";
@@ -37,6 +38,22 @@ export interface CheckRequest {
 
 export function d20(): number {
   return 1 + Math.floor(Math.random() * 20);
+}
+
+/** Keep the lower of two dice when armour or a close-range bow hinders the roll. */
+export function attackDie(disadvantage: boolean): number {
+  const first = d20();
+  if (!disadvantage) return first;
+  return Math.min(first, d20());
+}
+
+/** Stealth in noisy armour, or dexterity while under-strength in heavy armour. */
+export function armourHinders(c: Character, req: CheckRequest): boolean {
+  const body = c.equipped?.armor ? ARMOR[c.equipped.armor] : undefined;
+  if (!body) return false;
+  if (req.skill === "stealth" && body.stealthPenalty) return true;
+  if (req.ability === "dex" && body.minStr != null && finalScores(c).str < body.minStr) return true;
+  return false;
 }
 
 export function roll(sides: number, times = 1): number {
@@ -74,7 +91,8 @@ export function bonusFor(c: Character, req: CheckRequest): { bonus: number; labe
  * thing happens but it costs you.
  */
 export function resolve(c: Character, req: CheckRequest): Roll {
-  const die = d20();
+  const hindered = armourHinders(c, req);
+  const die = attackDie(hindered);
   const { bonus, label } = bonusFor(c, req);
   const total = die + bonus;
   let outcome: Outcome;
@@ -83,7 +101,14 @@ export function resolve(c: Character, req: CheckRequest): Roll {
   else if (total >= req.dc) outcome = "success";
   else if (total >= req.dc - 2) outcome = "partial";
   else outcome = "failure";
-  return { die, bonus, total, dc: req.dc, outcome, label };
+  return {
+    die,
+    bonus,
+    total,
+    dc: req.dc,
+    outcome,
+    label: hindered ? `${label}, hindered by armour` : label,
+  };
 }
 
 /** Which branch of the GM's proposal an outcome takes. */

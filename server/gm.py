@@ -56,6 +56,9 @@ HOW THE TABLE WORKS - this is absolute:
 - You propose a check; the engine rolls it and tells you the result next turn.
 - You NEVER set hit points, gold or inventory directly. You state what an
   outcome COSTS, as a consequence object, and the engine applies it.
+- The prompt names what they wear, the weapon in hand, and their armour class.
+  That armour class is already decided. Mention the gear when it matters.
+  Do not invent a different number for it.
 - You are given the roll that was already made. Narrate it as a fact that has
   happened. Do not contradict it, soften it, or re-decide it.
 
@@ -188,6 +191,11 @@ def scene_prompt(payload):
         lines.append("Trained in: " + ", ".join(c["skills"]) + ".")
     if c.get("party"):
         lines.append("With them: " + ", ".join(c["party"]) + ".")
+    lines.append(
+        f"Wearing: {c.get('armour') or 'nothing'}. "
+        f"Weapon in hand: {c.get('weapon') or 'nothing'}. "
+        f"Armour class {c.get('ac', '?')} is already decided. Do not change it."
+    )
     lines.append("")
     lines.append(f"THE WORK: \"{q.get('title','a job')}\", given by {q.get('giver','someone')}.")
     lines.append(f"The objective: {q.get('objective','')}")

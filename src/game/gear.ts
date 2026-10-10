@@ -58,6 +58,8 @@ export const ARMOR: Record<string, ArmorSpec> = {
 
 export interface WeaponSpec {
   damage: string;
+  /** die used when the other hand is empty, e.g. a longsword's 1d10 */
+  twoHands?: string;
   /** ability the attack uses; "finesse" means take the better of str/dex */
   uses: "str" | "dex" | "finesse";
   hands: 1 | 2;
@@ -69,10 +71,10 @@ export const WEAPONS: Record<string, WeaponSpec> = {
   dagger: { damage: "1d4 piercing", uses: "finesse", hands: 1, note: "Thrown, if it comes to that." },
   handaxe: { damage: "1d6 slashing", uses: "str", hands: 1, note: "Thrown 20/60." },
   shortsword: { damage: "1d6 piercing", uses: "finesse", hands: 1 },
-  spear: { damage: "1d6 piercing", uses: "str", hands: 1, note: "1d8 in two hands." },
+  spear: { damage: "1d6 piercing", twoHands: "1d8", uses: "str", hands: 1, note: "1d8 in two hands." },
   mace: { damage: "1d6 bludgeoning", uses: "str", hands: 1 },
   warhammer: { damage: "1d8 bludgeoning", uses: "str", hands: 1 },
-  longsword: { damage: "1d8 slashing", uses: "str", hands: 1, note: "1d10 in two hands." },
+  longsword: { damage: "1d8 slashing", twoHands: "1d10", uses: "str", hands: 1, note: "1d10 in two hands." },
   battleaxe: { damage: "1d8 slashing", uses: "str", hands: 1 },
   rapier: { damage: "1d8 piercing", uses: "finesse", hands: 1 },
   greatsword: { damage: "2d6 slashing", uses: "str", hands: 2 },
@@ -149,6 +151,26 @@ export function armorClassFrom(equipped: Equipped, dexMod: number): {
   }
 
   return { value, from };
+}
+
+/** The die a swing actually uses. Two hands only when the other is empty. */
+export function damageExpr(spec: WeaponSpec, bothHands: boolean): string {
+  const raw = bothHands && spec.twoHands ? spec.twoHands : spec.damage;
+  return raw.replace(/\s.*$/, "");
+}
+
+/** A shield or anything in the off hand keeps a weapon one-handed. */
+export function bothHandsFree(equipped: Equipped): boolean {
+  if (equipped.offHand) return false;
+  const shield = equipped.shield ? ARMOR[equipped.shield] : undefined;
+  return !(shield && shield.weight === "shield");
+}
+
+export function offHandWeapon(equipped: Equipped): { id: string; spec: WeaponSpec } | null {
+  const id = equipped.offHand ?? null;
+  if (!id) return null;
+  const spec = WEAPONS[id];
+  return spec ? { id, spec } : null;
 }
 
 /** A two-handed weapon takes the off hand with it. */

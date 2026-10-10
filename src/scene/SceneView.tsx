@@ -12,7 +12,9 @@ import { worldLedger, rememberFacts } from "../model/memory";
 import { type LevelNote } from "../rules/advance";
 import { LevelRise } from "../game/LevelRise";
 import { maxHp, hpOf } from "../rules/derive";
+import { heroArmorClass } from "../game/party";
 import { COMPANIONS } from "../town/inn";
+import { itemById } from "../town/shops";
 import type { Quest } from "../town/quests";
 import { OUTCOME_WORD, type Roll } from "./dice";
 import {
@@ -33,6 +35,11 @@ import { CombatPanel } from "./CombatPanel";
 import { beginCombat, type CombatState } from "./combat";
 import { pickFoe } from "./foes";
 
+function wornLabel(id: string | null | undefined): string | null {
+  if (!id) return null;
+  return itemById(id)?.name ?? id;
+}
+
 function seedFor(
   c: Character,
   quest: Quest,
@@ -41,6 +48,9 @@ function seedFor(
 ): SceneSeed {
   const site = siteById(run.siteId)!;
   const hpMax = maxHp(c).value;
+  const armour =
+    [wornLabel(c.equipped?.armor), wornLabel(c.equipped?.shield)].filter(Boolean).join(" and ") ||
+    "nothing";
   return {
     character: {
       name: c.name,
@@ -54,6 +64,9 @@ function seedFor(
       party: c.companions.map(
         (id) => COMPANIONS.find((x) => x.id === id)?.name ?? id,
       ),
+      ac: heroArmorClass(c),
+      weapon: wornLabel(c.equipped?.mainHand) ?? "nothing",
+      armour,
     },
     quest: { title: quest.title, giver: quest.giver, objective: quest.detail },
     site: {

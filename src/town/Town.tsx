@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { totalLevel, type Character } from "../model/character";
-import { armorClass, maxHp, hpOf } from "../rules/derive";
+import { maxHp, hpOf } from "../rules/derive";
 import {
   LOCATIONS,
   TOWN_MAP_ART,
@@ -19,8 +19,7 @@ import { PartySheet } from "../game/PartySheet";
 import { LevelRise } from "../game/LevelRise";
 import { applyLevels, levelFromXp, xpToNext, type LevelNote } from "../rules/advance";
 import { rememberFacts } from "../model/memory";
-import { armorClassFrom } from "../game/gear";
-import { modifiers } from "../rules/derive";
+import { heroArmorClass } from "../game/party";
 import {
   ROOM_PRICE,
   MEAL_PRICE,
@@ -554,7 +553,7 @@ export function TownView({
         <span>
           HP {hp}/{maxHp(local).value}
         </span>
-        <span>AC {local.overrides?.armorClass ? armorClass(local).value : armorClassFrom(local.equipped ?? {}, modifiers(local).dex).value}</span>
+        <span>AC {heroArmorClass(local)}</span>
         <span>{local.coin.gp} gp</span>
         <span>Pack {local.pack.length}</span>
         {local.companions.length > 0 && (

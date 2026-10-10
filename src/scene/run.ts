@@ -91,6 +91,12 @@ export interface SceneSeed {
     gp: number;
     skills: string[];
     party: string[];
+    /** worn armour class; the engine already decided it */
+    ac?: number;
+    /** main-hand weapon, or "nothing" */
+    weapon?: string;
+    /** body armour and shield, or "nothing" */
+    armour?: string;
   };
   quest: { title: string; giver: string; objective: string };
   site: { name: string; description: string; rooms: { id: string; name: string; note: string }[] };

@@ -14,7 +14,6 @@
 import type { Ability, Character } from "../model/character";
 import { totalLevel } from "../model/character";
 import {
-  armorClass,
   maxHp,
   modifiers,
   proficiencyBonus,
@@ -23,8 +22,16 @@ import {
   spellSlots,
   hpOf,
 } from "../rules/derive";
-import { WEAPONS, type WeaponSpec } from "../game/gear";
-import { d20, roll } from "./dice";
+import { heroArmorClass } from "../game/party";
+import {
+  WEAPONS,
+  bothHandsFree,
+  damageExpr,
+  offHandWeapon,
+  type Equipped,
+  type WeaponSpec,
+} from "../game/gear";
+import { armourHinders, attackDie, d20, roll } from "./dice";
 import { matchFoe, tierCap, foeCeiling, type FoeSpec } from "./foes";
 import { spellEffect, type SpellEffect } from "./spells";
 import { usable } from "./items";
@@ -162,9 +169,9 @@ export function livingFoes(s: CombatState): Combatant[] {
   return s.foes.filter((f) => !f.down);
 }
 
-/** Your AC, including anything you have cast on yourself this fight. */
+/** Worn armour, plus any ward raised this fight. An override still wins. */
 export function playerAc(c: Character, s: CombatState): number {
-  return armorClass(c).value + (s.wardRounds > 0 ? s.wardAc : 0);
+  return heroArmorClass(c) + (s.wardRounds > 0 ? s.wardAc : 0);
 }
 
 /** The weapon you are actually holding, or your fists. */
@@ -191,26 +198,42 @@ export interface Option {
   disabled?: string;
 }
 
+function signed(n: number): string {
+  return `${n >= 0 ? "+" : ""}${n}`;
+}
+
 export function optionsFor(c: Character, s: CombatState): Option[] {
   const mods = modifiers(c);
+  const equipped = (c.equipped ?? {}) as Equipped;
+  const prof = proficiencyBonus(c).value;
   const out: Option[] = [];
+
+  const off = offHandWeapon(equipped);
+  let offDetail = "";
+  if (off) {
+    const ab = weaponAbility(off.spec, mods);
+    const expr = damageExpr(off.spec, false);
+    const close = off.spec.ranged ? ", disadvantage up close" : "";
+    offDetail = `; off hand ${signed(mods[ab] + prof)} to hit, ${expr}${close}`;
+  }
 
   const w = activeWeapon(c);
   if (w) {
     const ab = weaponAbility(w.spec, mods);
-    const bonus = mods[ab] + proficiencyBonus(c).value;
+    const expr = damageExpr(w.spec, bothHandsFree(equipped) && !w.spec.ranged);
+    const close = w.spec.ranged ? ", disadvantage up close" : "";
     out.push({
       kind: "attack",
       id: w.id,
       label: `Attack with your ${w.id.replace(/-/g, " ")}`,
-      detail: `${bonus >= 0 ? "+" : ""}${bonus} to hit, ${w.spec.damage}${s.coating ? ` +${s.coating} poison` : ""}`,
+      detail: `${signed(mods[ab] + prof)} to hit, ${expr}${s.coating ? ` +${s.coating} poison` : ""}${close}${offDetail}`,
     });
   } else {
     out.push({
       kind: "attack",
       id: "unarmed",
       label: "Strike with your fists",
-      detail: `${mods.str >= 0 ? "+" : ""}${mods.str + proficiencyBonus(c).value} to hit, 1 damage`,
+      detail: `${signed(mods.str + prof)} to hit, 1 damage${offDetail}`,
     });
   }
 
@@ -292,13 +315,18 @@ export function playerTurn(
   const target = firstStanding(s);
 
   if (option.kind === "flee") {
-    const die = d20();
+    const hindered = armourHinders(c, { ability: "dex", dc: 12, stakes: "getting clear" });
+    const die = attackDie(hindered);
     const total = die + mods.dex;
     const ok = total >= 12;
     s.log.push({
       round: s.round,
       who: "you",
-      text: ok ? "You break away and do not look back." : "You turn to run and something catches your arm.",
+      text: ok
+        ? "You break away and do not look back."
+        : hindered
+          ? "The armour makes the turn clumsy, and something catches your arm."
+          : "You turn to run and something catches your arm.",
       die,
       total,
       against: 12,
@@ -313,40 +341,73 @@ export function playerTurn(
     s.wardRounds = 1;
     s.log.push({ round: s.round, who: "you", text: "You set your feet and cover up." });
   } else if (option.kind === "attack" && target) {
+    const equipped = (c.equipped ?? {}) as Equipped;
     const w = activeWeapon(c);
-    const ab = w ? weaponAbility(w.spec, mods) : "str";
-    const bonus = mods[ab] + prof;
-    const die = d20();
-    const total = die + bonus;
-    const crit = die === 20;
-    const hit = crit || (die !== 1 && total >= target.ac);
-    let dmg = 0;
-    if (hit) {
-      const expr = w ? w.spec.damage.replace(/\s.*$/, "") : "1";
-      dmg = rollDice(expr) + mods[ab];
-      if (crit) dmg += rollDice(expr);
-      if (s.coating) {
-        dmg += rollDice(s.coating);
-        s.coating = null;
+
+    const swing = (
+      spec: WeaponSpec | null,
+      bothHands: boolean,
+      addAbility: boolean,
+      disadvantage: boolean,
+      coat: boolean,
+      hand: "main" | "off",
+    ) => {
+      const foe = firstStanding(s);
+      if (!foe) return;
+      const ab: Ability = spec ? weaponAbility(spec, mods) : "str";
+      const die = attackDie(disadvantage);
+      const total = die + mods[ab] + prof;
+      const crit = die === 20;
+      const hit = crit || (die !== 1 && total >= foe.ac);
+      let dmg = 0;
+      if (hit) {
+        const expr = spec ? damageExpr(spec, bothHands) : "1";
+        dmg = rollDice(expr) + (addAbility ? mods[ab] : 0);
+        if (crit) dmg += rollDice(expr);
+        if (coat && s.coating) {
+          dmg += rollDice(s.coating);
+          s.coating = null;
+        }
+        dmg = Math.max(1, dmg);
+        damageFoe(s, foe, dmg);
       }
-      dmg = Math.max(1, dmg);
-      damageFoe(s, target, dmg);
-    }
-    s.log.push({
-      round: s.round,
-      who: "you",
-      text: hit
-        ? `You ${crit ? "land it perfectly on" : "hit"} the ${target.name.toLowerCase()}${target.down ? " and it goes down" : ""}.`
-        : die === 1
-          ? "Your swing goes wide enough to hurt your shoulder."
-          : `The ${target.name.toLowerCase()} turns your blade.`,
-      die,
-      total,
-      against: target.ac,
-      hit,
-      damage: hit ? dmg : undefined,
-      crit,
-    });
+      const name = foe.name.toLowerCase();
+      const down = foe.down ? " and it goes down" : "";
+      const text =
+        hand === "off"
+          ? hit
+            ? `Your off hand ${crit ? "lands perfectly on" : "hits"} the ${name}${down}.`
+            : die === 1
+              ? "Your off hand goes wide."
+              : `The ${name} turns the off-hand blow.`
+          : hit
+            ? `You ${crit ? "land it perfectly on" : "hit"} the ${name}${down}.`
+            : die === 1
+              ? "Your swing goes wide enough to hurt your shoulder."
+              : `The ${name} turns your blade.`;
+      s.log.push({
+        round: s.round,
+        who: "you",
+        text,
+        die,
+        total,
+        against: foe.ac,
+        hit,
+        damage: hit ? dmg : undefined,
+        crit,
+      });
+    };
+
+    swing(
+      w?.spec ?? null,
+      !!(w && bothHandsFree(equipped) && !w.spec.ranged),
+      true,
+      !!w?.spec.ranged,
+      true,
+      "main",
+    );
+    const off = offHandWeapon(equipped);
+    if (off) swing(off.spec, false, false, !!off.spec.ranged, false, "off");
   } else if (option.kind === "spell") {
     const e = spellEffect(option.id);
     if (e) {
@@ -449,7 +510,7 @@ export function playerTurn(
 /** Their turn. Every attack is rolled against your real armour class. */
 function foesTurn(c: Character, state: CombatState): CombatState {
   const s = state;
-  const ac = armorClass(c).value + (s.wardRounds > 0 ? s.wardAc : 0);
+  const ac = playerAc(c, s);
   for (const f of livingFoes(s)) {
     const die = d20();
     const total = die + f.toHit;

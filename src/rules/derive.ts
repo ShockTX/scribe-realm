@@ -12,6 +12,7 @@ import {
 import {
   classByIndex, classLevelRow, raceByIndex, skillByIndex, spellByIndex,
 } from "./srd";
+import { ARMOR } from "../game/gear";
 
 export interface Derived<T = number> {
   value: T;
@@ -90,10 +91,16 @@ export function maxHp(c: Character): Derived {
 
 export function speed(c: Character): Derived {
   const race = c.raceIndex ? raceByIndex.get(c.raceIndex) : undefined;
-  return withOverride(c, "speed", race?.speed ?? 30);
+  let value = race?.speed ?? 30;
+  const body = c.equipped?.armor ? ARMOR[c.equipped.armor] : undefined;
+  if (body?.minStr && finalScores(c).str < body.minStr) value = Math.max(0, value - 10);
+  return withOverride(c, "speed", value);
 }
 
-/** Unarmoured: 10 + dex. Armour is bought in town and layered on later. */
+/**
+ * Unarmoured 10 + dex, or a hand-set override.
+ * Worn armour is heroArmorClass in game/party.ts. A fight must use that.
+ */
 export function armorClass(c: Character): Derived {
   return withOverride(c, "armorClass", 10 + modifiers(c).dex);
 }
