@@ -20,6 +20,7 @@ import { LevelRise } from "../game/LevelRise";
 import { applyLevels, levelFromXp, xpToNext, type LevelNote } from "../rules/advance";
 import { rememberFacts } from "../model/memory";
 import { heroArmorClass } from "../game/party";
+import { unequipId, type Equipped } from "../game/gear";
 import {
   ROOM_PRICE,
   MEAL_PRICE,
@@ -165,7 +166,8 @@ function Counter({
           {[...counts.entries()].map(([id, n]) => {
             const item = itemById(id);
             const name = item ? item.name : id;
-            const price = item ? sellPrice(item.price) : 1;
+            // P8: unknown ids pay nothing — a 1gp fallback mints coin from junk.
+            const price = item ? sellPrice(item.price) : 0;
             return (
               <li key={id} className="ware">
                 <div className="ware__text">
@@ -259,6 +261,9 @@ function InnCounter({
   );
 }
 
+/** setCharacter that also accepts a functional update (Board needs it). */
+type SetCharacter = (next: Character | ((prev: Character) => Character)) => void;
+
 /** Inside one building. */
 function Interior({
   loc,
@@ -269,7 +274,7 @@ function Interior({
 }: {
   loc: TownLocation;
   character: Character;
-  setCharacter: (c: Character) => void;
+  setCharacter: SetCharacter;
   onLeave: () => void;
   onVenture: () => void;
 }) {
@@ -278,6 +283,9 @@ function Interior({
   const panels = placePanels(loc, stock.length);
 
   const buy = (item: ShopItem) => {
+    // P8: the button disables when poor, but a stale render could still fire
+    // — never sell on credit.
+    if (character.coin.gp < item.price) return;
     setCharacter({
       ...character,
       coin: { ...character.coin, gp: character.coin.gp - item.price },
@@ -287,12 +295,32 @@ function Interior({
   };
 
   const sell = (itemId: string) => {
+    // P8: splice(-1) would eat the LAST pack item while paying for this one.
+    // Nothing of that id in the pack means no sale and no pay.
+    const idx = character.pack.indexOf(itemId);
+    if (idx === -1) return setSaid("There's nothing like that in the pack to sell.");
     const item = itemById(itemId);
-    const price = item ? sellPrice(item.price) : 1;
+    // P8: unknown ids pay nothing — no mint for unsellable junk.
+    const price = item ? sellPrice(item.price) : 0;
     const pack = [...character.pack];
-    pack.splice(pack.indexOf(itemId), 1);
+    pack.splice(idx, 1);
+    // P8: a sold copy that is also worn (older saves kept worn ids in the
+    // pack) comes off first, or the sheet keeps showing a ghost. A spare
+    // copy still in the pack keeps its slot — only the last copy unwears.
+    // Armour class re-derives from what is worn, so no stored number to fix.
+    const lastCopy = !pack.includes(itemId);
+    const equipped = lastCopy
+      ? unequipId((character.equipped ?? {}) as Equipped, itemId)
+      : character.equipped;
+    const companionGear = lastCopy
+      ? Object.fromEntries(
+          Object.entries(character.companionGear ?? {}).map(([k, g]) => [k, unequipId(g as Equipped, itemId)]),
+        )
+      : character.companionGear;
     setCharacter({
       ...character,
+      equipped,
+      companionGear,
       coin: { ...character.coin, gp: character.coin.gp + price },
       pack,
     });
@@ -300,6 +328,8 @@ function Interior({
   };
 
   const rest = () => {
+    // P8: stale-state safe — the button disables, the guard decides.
+    if (character.coin.gp < ROOM_PRICE) return;
     const full = maxHp(character).value;
     setCharacter({
       ...character,
@@ -312,6 +342,8 @@ function Interior({
   };
 
   const meal = () => {
+    // P8: stale-state safe — the button disables, the guard decides.
+    if (character.coin.gp < MEAL_PRICE) return;
     const full = maxHp(character).value;
     const hp = hpOf(character);
     setCharacter({
@@ -323,6 +355,8 @@ function Interior({
   };
 
   const hire = (fee: number, id: string, name: string) => {
+    // P8: no double-hire and no credit — stale double-taps do nothing.
+    if (character.companions.includes(id) || character.coin.gp < fee) return;
     setCharacter({
       ...character,
       coin: { ...character.coin, gp: character.coin.gp - fee },

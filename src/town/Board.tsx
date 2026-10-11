@@ -1,7 +1,7 @@
 /**
  * The Reach Register. A board of work, written fresh by the GM.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Character } from "../model/character";
 import { totalLevel } from "../model/character";
 import {
@@ -32,6 +32,10 @@ function seedFrom(c: Character): QuestSeed {
   };
 }
 
+/** setCharacter that also accepts a functional update — required so async
+ *  answers (askForQuest) never write over a newer character. */
+type SetCharacter = (next: Character | ((prev: Character) => Character)) => void;
+
 export function Board({
   character,
   setCharacter,
@@ -41,7 +45,7 @@ export function Board({
   placeId,
 }: {
   character: Character;
-  setCharacter: (c: Character) => void;
+  setCharacter: SetCharacter;
   say: (s: string) => void;
   onVenture: () => void;
   /** Only the Register asks for a bill the moment you walk in. */
@@ -52,10 +56,16 @@ export function Board({
   const [trouble, setTrouble] = useState<string | null>(null);
   const quests = character.quests ?? [];
   const open = quests.filter((q) => q.state !== "done");
+  // P8: StrictMode double-invokes mount effects in dev — the ref keeps the
+  // arrival posting to one bill.
+  const asked = useRef(false);
 
   // An empty board on arrival asks for one posting, once.
   useEffect(() => {
-    if (autoAsk && quests.length === 0) void post();
+    if (autoAsk && quests.length === 0 && !asked.current) {
+      asked.current = true;
+      void post();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -70,7 +80,9 @@ export function Board({
         rumourOfTheDay(character.day),
         character.memory,
       );
-      setCharacter({ ...character, quests: [...quests, q] });
+      // P8: functional update — the fetch above can outlive re-renders, so
+      // appending to the closed-over quests array could drop newer bills.
+      setCharacter((prev) => ({ ...prev, quests: [...(prev.quests ?? []), q] }));
       say(postedLine(placeId, q.title));
     } catch (e) {
       setTrouble(
@@ -82,19 +94,25 @@ export function Board({
   }
 
   function take(id: string) {
-    setCharacter({
-      ...character,
-      quests: quests.map((q) => (q.id === id ? { ...q, state: "taken" } : q)),
-    });
+    // P8: never interleave a take with a posting in flight.
+    if (busy) return;
+    setCharacter((prev) => ({
+      ...prev,
+      quests: (prev.quests ?? []).map((q) => (q.id === id ? { ...q, state: "taken" } : q)),
+    }));
     const q = quests.find((x) => x.id === id);
     if (q) say(`You take down the bill for ${q.title}. It is yours now.`);
   }
 
   function venture(id: string) {
+    // P8: never venture twice (or mid-post) — the second run would overwrite
+    // the first before it is ever played.
+    if (busy) return;
     const q = quests.find((x) => x.id === id);
     if (!q) return;
     const site = siteForQuest(q.where, q.title);
-    setCharacter({ ...character, activeRun: newRun(q.id, site) });
+    const run = newRun(q.id, site);
+    setCharacter((prev) => ({ ...prev, activeRun: run }));
     onVenture();
   }
 
@@ -130,11 +148,11 @@ export function Board({
               </span>
             </div>
             {q.state === "offered" ? (
-              <button className="ware__buy" onClick={() => take(q.id)}>
+              <button className="ware__buy" onClick={() => take(q.id)} disabled={busy}>
                 Take it down
               </button>
             ) : (
-              <button className="ware__buy" onClick={() => venture(q.id)}>
+              <button className="ware__buy" onClick={() => venture(q.id)} disabled={busy}>
                 Venture out
               </button>
             )}

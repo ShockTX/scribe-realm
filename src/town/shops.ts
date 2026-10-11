@@ -26,9 +26,12 @@ export interface ShopItem {
   note: string;
 }
 
-/** Shops buy at half, rounded down, and never for nothing. */
+/** Shops buy at half, rounded down — and a 1gp trinket buys nothing back.
+/// Deliberately NO floor: a 1gp floor meant buying nothing and selling
+/// everything that costs 1gp for 1gp, i.e. a mint for unsellable junk.
+/// Unknown ids are not priced here at all (the counter pays 0 for those). */
 export function sellPrice(price: number): number {
-  return Math.max(1, Math.floor(price / 2));
+  return Math.floor(price / 2);
 }
 
 export const STOCK: Record<string, ShopItem[]> = {

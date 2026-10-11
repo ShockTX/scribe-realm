@@ -2,6 +2,7 @@
  * The fight, inside a beat. Real d20s against real AC, real slots, real items.
  * The engine owns every number here; the Warden only says a fight started.
  */
+import { useRef } from "react";
 import type { Character } from "../model/character";
 import {
   applyCombat,
@@ -29,13 +30,24 @@ export function CombatPanel({
 }) {
   const options = optionsFor(character, state);
   const standing = livingFoes(state);
+  // P7: playerTurn + setState are synchronous, so a double-click lands twice
+  // before React re-renders with state.over set. The lock ignores the second
+  // tap until the state settles.
+  const takeBusy = useRef(false);
 
   function take(o: Option) {
-    if (o.disabled || state.over) return;
-    const next = playerTurn(character, state, o);
-    setState(next);
-    if (next.over) {
-      setCharacter(applyCombat(character, next));
+    if (takeBusy.current || o.disabled || state.over) return;
+    takeBusy.current = true;
+    try {
+      const next = playerTurn(character, state, o);
+      setState(next);
+      if (next.over) {
+        setCharacter(applyCombat(character, next));
+      }
+    } finally {
+      setTimeout(() => {
+        takeBusy.current = false;
+      }, 0);
     }
   }
 

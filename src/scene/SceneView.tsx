@@ -21,9 +21,12 @@ import {
   adjudicate,
   askScene,
   beatLine,
+  combatBeat,
   GmSilent,
   newRun,
   applySettlement,
+  requirePendingClearBeforeTravel,
+  resolvePendingBeforeFight,
   type Beat,
   type Run,
   type SceneReply,
@@ -143,6 +146,18 @@ export function SceneView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run.ending]);
 
+  // P7: a reload mid-fight would discard CombatState.hpNow — the wounds live
+  // in fight state until CombatPanel writes them back via applyCombat, and
+  // Leave is locked meanwhile, so warn before the browser throws them away.
+  useEffect(() => {
+    if (!fight) return;
+    const guard = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", guard);
+    return () => window.removeEventListener("beforeunload", guard);
+  }, [fight]);
+
   /** Walking the map. No roll — leaving is the choice. The next beat is the arrival. */
   async function travel(roomId: string) {
     if (busy || !pending || run.ending || fight) return;
@@ -151,11 +166,52 @@ export function SceneView({
     setBusy(true);
     setTrouble(null);
     setTyped("");
+    // P7: travel must not drop a pending check. When one is open, the check
+    // is adjudicated FIRST and recorded on this very beat — the travel text
+    // is the action the check resolves, so the original action is preserved
+    // (never rewritten to an orphan) and the consequence still lands.
+    let char = character;
+    let beats = run.beats;
+    let ledger = run.ledger;
     const action = `I leave ${room?.name ?? "here"} and make for ${dest.name}.`;
-    const done: Beat = { ...run.beats[run.beats.length - 1], action };
-    const beats = [...run.beats.slice(0, -1), done];
-    const mid: Run = { ...run, beats, roomId: dest.id };
-    if (beats.length >= mid.length + 2) {
+    const mustSettle = requirePendingClearBeforeTravel(pending);
+    if (mustSettle) {
+      const judged = resolvePendingBeforeFight(pending, char);
+      if (judged) {
+        const last = beats[beats.length - 1];
+        const done: Beat = {
+          ...last,
+          action: last.action ?? action,
+          roll: judged.roll,
+          result: judged.text,
+          consequence: judged.consequence,
+        };
+        beats = [...beats.slice(0, -1), done];
+        if (judged.consequence.remember) ledger = [...ledger, judged.consequence.remember];
+        char = rememberFacts(judged.after, [judged.consequence.remember]);
+        if (char.currentHp <= 0) {
+          setCharacter(char);
+          setRun({
+            ...run,
+            beats,
+            ledger,
+            ending: "lost",
+            epilogue:
+              "You go down in the dark, and the place keeps whatever it was holding. Someone finds you, eventually.",
+          });
+          setPending(null);
+          setBusy(false);
+          return;
+        }
+      }
+      setPending(null);
+      // Re-ask below with the settled character; the fresh reply becomes pending.
+    }
+    const done: Beat = { ...beats[beats.length - 1], action };
+    const settled: Beat[] = mustSettle ? beats : [...beats.slice(0, -1), done];
+    const mid: Run = { ...run, beats: settled, ledger, roomId: dest.id };
+    if (settled.length >= mid.length + 2) {
+      setCharacter(char);
       setRun({
         ...mid,
         ending: "cost",
@@ -166,8 +222,8 @@ export function SceneView({
       return;
     }
     try {
-      const reply = await askScene(seedFor(character, quest, mid, { action }));
-      setCharacter(rememberFacts(character, [reply.remember]));
+      const reply = await askScene(seedFor(char, quest, mid, { action }));
+      setCharacter(rememberFacts(char, [reply.remember]));
       const arrived = reply.moveTo && roomById(site, reply.moveTo) ? reply.moveTo : dest.id;
       if (reply.ending) {
         setRun({
@@ -183,12 +239,14 @@ export function SceneView({
         setRun({
           ...mid,
           roomId: arrived,
-          beats: [...beats, { n: beats.length + 1, roomId: arrived, situation: reply.situation }],
+          beats: [...settled, { n: settled.length + 1, roomId: arrived, situation: reply.situation }],
           ledger: reply.remember ? [...mid.ledger, reply.remember] : mid.ledger,
         });
       }
     } catch (e) {
       setTrouble(e instanceof GmSilent ? e.message : "the Warden is silent");
+      // The settled check still happened — keep its consequence and ledger.
+      setCharacter(char);
       setRun(mid);
     } finally {
       setBusy(false);
@@ -198,7 +256,105 @@ export function SceneView({
   function startFight(name: string, count: number) {
     if (foughtBeat.current === run.beats.length) return;
     foughtBeat.current = run.beats.length;
-    setFight(beginCombat(character, name, count));
+    // P7: a pending check resolves BEFORE steel is drawn, never after. The
+    // check's consequence lands, the beat records it, pending clears — and
+    // only then does the fight begin. Post-fight carryOnAfterCombat() must
+    // NOT re-roll: it only asks what comes next.
+    const judged = resolvePendingBeforeFight(pending, character);
+    if (judged && run.beats.length > 0) {
+      const last = run.beats[run.beats.length - 1];
+      const done: Beat = {
+        ...last,
+        action: last.action ?? `You stand to meet ${name}.`,
+        roll: judged.roll,
+        result: judged.text,
+        consequence: judged.consequence,
+      };
+      const ledger = [...run.ledger];
+      if (judged.consequence.remember) ledger.push(judged.consequence.remember);
+      const after = rememberFacts(judged.after, [judged.consequence.remember]);
+      if (after.currentHp <= 0) {
+        // The check drops you before the fight begins — no fight to have.
+        setCharacter(after);
+        setRun({
+          ...run,
+          beats: [...run.beats.slice(0, -1), done],
+          ledger,
+          ending: "lost",
+          epilogue:
+            "You go down in the dark, and the place keeps whatever it was holding. Someone finds you, eventually.",
+        });
+        setPending(null);
+        return;
+      }
+      setCharacter(after);
+      setRun({ ...run, beats: [...run.beats.slice(0, -1), done], ledger });
+      setPending(null);
+      setFight(beginCombat(after, name, count));
+    } else {
+      setFight(beginCombat(character, name, count));
+    }
+  }
+
+  /**
+   * P7: what happens after the steel stops. `summary` is
+   * combatSummary(state) — engine provenance, kept as the action string so
+   * the Warden narrates a fact rather than a guess. Deliberately NO
+   * adjudicate() here: the pending check (if any) was settled before the
+   * fight, and the fight's own wounds are already on the character via
+   * applyCombat in CombatPanel. This only asks the Warden what comes next.
+   */
+  async function carryOnAfterCombat(summary: string) {
+    if (busy || run.ending) return;
+    setBusy(true);
+    setTrouble(null);
+    // A fight that began with no pending check left the last beat without an
+    // action — the fight itself is what happened there. Otherwise the
+    // pre-fight settlement already recorded the beat, and we only append.
+    const last = run.beats[run.beats.length - 1];
+    const baseBeats =
+      last && !last.action
+        ? [...run.beats.slice(0, -1), combatBeat(last, summary)]
+        : run.beats;
+    const base: Run = { ...run, beats: baseBeats };
+    if (baseBeats.length >= base.length + 2) {
+      setRun({
+        ...base,
+        ending: "cost",
+        epilogue: "You have had enough of this place, and you leave with what you have.",
+      });
+      setPending(null);
+      setBusy(false);
+      return;
+    }
+    try {
+      const reply = await askScene(seedFor(character, quest, base, { action: summary }));
+      setCharacter(rememberFacts(character, [reply.remember]));
+      const roomId = reply.moveTo && roomById(site, reply.moveTo) ? reply.moveTo : base.roomId;
+      if (reply.ending) {
+        setRun({
+          ...base,
+          roomId,
+          ending: reply.ending,
+          epilogue: reply.epilogue ?? reply.situation,
+          ledger: reply.remember ? [...base.ledger, reply.remember] : base.ledger,
+        });
+        setPending(null);
+      } else {
+        setPending(reply);
+        setRun({
+          ...base,
+          roomId,
+          beats: [...baseBeats, { n: baseBeats.length + 1, roomId, situation: reply.situation }],
+          ledger: reply.remember ? [...base.ledger, reply.remember] : base.ledger,
+        });
+      }
+    } catch (e) {
+      setTrouble(e instanceof GmSilent ? e.message : "the Warden is silent");
+      setRun(base);
+    } finally {
+      setBusy(false);
+    }
   }
 
   useEffect(() => {
@@ -460,7 +616,9 @@ export function SceneView({
               });
               setPending(null);
             } else {
-              void act(summary);
+              // P7: no act(summary) here — that would re-roll the pending
+              // check the pre-fight settlement already resolved. Carry on only.
+              void carryOnAfterCombat(summary);
             }
           }}
         />
@@ -511,7 +669,15 @@ export function SceneView({
         </div>
       )}
 
-      <button className="link link--back" onClick={onLeave}>
+      {/* P7: leaving mid-fight would discard CombatState.hpNow — the wounds
+          only reach the character when the fight ends via applyCombat, so the
+          door stays shut until it does. */}
+      <button
+        className="link link--back"
+        onClick={onLeave}
+        disabled={!!fight}
+        title={fight ? "Finish the fight first — leaving now would lose its wounds." : undefined}
+      >
         {run.ending ? "← Back to town" : "← Leave (the work stays open)"}
       </button>
     </div>

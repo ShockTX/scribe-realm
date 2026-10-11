@@ -6,10 +6,13 @@ import { SITES } from "../sites";
 import {
   adjudicate,
   askScene,
+  combatBeat,
   dangerBase,
   newRun,
   readScene,
   applySettlement,
+  requirePendingClearBeforeTravel,
+  resolvePendingBeforeFight,
   settleRun,
   type Run,
   type SceneSeed,
@@ -227,6 +230,52 @@ describe("settlement", () => {
     const s = settleRun(loaded, 20, "fair", 1);
     expect(s.loot).toEqual([]);
     expect(s.lines.join(" ")).not.toContain("carried out");
+  });
+});
+
+describe("P7 pending-before-fight ordering", () => {
+  const pendingCheck = {
+    situation: "Steel.",
+    suggestions: ["Duck"],
+    check: { ability: "dex" as const, dc: 5, stakes: "Your skin." },
+    onSuccess: { text: "Clear.", consequence: { hp: 1 } },
+    onFailure: { text: "Cut.", consequence: { hp: -2 } },
+  };
+  const pendingQuiet = { situation: "Quiet.", suggestions: ["Look"] };
+
+  it("resolvePendingBeforeFight returns null when there is no check to settle", () => {
+    expect(resolvePendingBeforeFight(null, hero())).toBeNull();
+    expect(resolvePendingBeforeFight(pendingQuiet, hero())).toBeNull();
+  });
+
+  it("resolvePendingBeforeFight adjudicates the check (and only the check)", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    const c = hero();
+    c.currentHp -= 3; // room to heal — maxHp clamps, so wound first.
+    const out = resolvePendingBeforeFight(pendingCheck, c);
+    expect(out).not.toBeNull();
+    expect(out!.branch).toBe("success");
+    expect(out!.text).toBe("Clear.");
+    expect(out!.consequence.hp).toBe(1);
+    expect(out!.after.currentHp).toBe(c.currentHp + 1);
+  });
+
+  it("requirePendingClearBeforeTravel blocks travel only while a check is open", () => {
+    expect(requirePendingClearBeforeTravel(null)).toBe(false);
+    expect(requirePendingClearBeforeTravel(pendingQuiet)).toBe(false);
+    expect(requirePendingClearBeforeTravel(pendingCheck)).toBe(true);
+  });
+
+  it("combatBeat keeps the beat and records the engine summary as its action", () => {
+    const last = { n: 2, roomId: "gate", situation: "They rush you." };
+    const done = combatBeat(last, "The fight is over. You killed 1 of them and you are on 8 hit points.");
+    expect(done.n).toBe(2);
+    expect(done.roomId).toBe("gate");
+    expect(done.situation).toBe("They rush you.");
+    // Provenance: the action string comes from combatSummary(), not a roll.
+    expect(done.action).toContain("The fight is over.");
+    expect(done.result).toContain("The fight is over.");
+    expect(done.roll).toBeUndefined();
   });
 });
 

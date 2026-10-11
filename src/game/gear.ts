@@ -4,7 +4,14 @@
  * The shop sells ids; this file is the only place that knows an id means
  * "18 pounds of scale mail, AC 14, and your dexterity barely counts".
  * Anything not listed here is simply carried, which is a legitimate answer.
+ *
+ * P8 — the single-copy invariant: one pack copy outfits one slot. equip()
+ * consumes a copy from the pack and returns the previous occupant to it
+ * (a swap); unequip() returns the worn copy. Nothing worn is ever conjured
+ * out of nothing, so one bought dagger can never outfit the whole party.
  */
+
+import type { Character } from "../model/character";
 
 export type Slot =
   | "armor"
@@ -173,8 +180,11 @@ export function offHandWeapon(equipped: Equipped): { id: string; spec: WeaponSpe
   return spec ? { id, spec } : null;
 }
 
-/** A two-handed weapon takes the off hand with it. */
-export function equip(
+/** A two-handed weapon takes the off hand with it. Pure slot write — no pack
+ *  movement. Prefer the Character-level equip()/unequip() below, which keep
+ *  the single-copy invariant; this stays exported for the displacement math
+ *  and for tests. */
+export function equipSlot(
   equipped: Equipped,
   slot: Slot,
   itemId: string,
@@ -189,11 +199,100 @@ export function equip(
   return next;
 }
 
-export function unequip(equipped: Equipped, slot: Slot): Equipped {
+/** Pure slot clear — no pack movement. Prefer Character-level unequip(). */
+export function unequipSlot(equipped: Equipped, slot: Slot): Equipped {
   return { ...equipped, [slot]: null };
 }
 
 /** Everything currently worn, as a flat list of item ids. */
 export function wornIds(equipped: Equipped): string[] {
   return Object.values(equipped).filter((v): v is string => typeof v === "string" && v.length > 0);
+}
+
+/** Every id worn by anyone — the hero plus every hire. Used to keep one
+ *  bought copy from outfitting two bodies, and to hide worn ghosts from the
+ *  pick lists. */
+export function allWornIds(character: {
+  equipped?: Equipped;
+  companionGear?: Record<string, Equipped>;
+}): string[] {
+  const ids = wornIds((character.equipped ?? {}) as Equipped);
+  for (const gear of Object.values(character.companionGear ?? {})) {
+    ids.push(...wornIds((gear ?? {}) as Equipped));
+  }
+  return ids;
+}
+
+/**
+ * Strip every slot holding `id`. Selling (or any pack removal) must not
+ * leave a ghost on the sheet — a sold thing is unworn everywhere first.
+ */
+export function unequipId(equipped: Equipped, id: string): Equipped {
+  const next: Equipped = { ...equipped };
+  for (const slot of Object.keys(next) as Slot[]) {
+    if (next[slot] === id) next[slot] = null;
+  }
+  return next;
+}
+
+function gearOf(character: Character, holder: string): Equipped {
+  if (holder === "hero") return ((character.equipped ?? {}) as Equipped);
+  return (((character.companionGear ?? {})[holder] ?? {}) as Equipped);
+}
+
+function withGear(character: Character, holder: string, gear: Equipped, pack: string[]): Character {
+  if (holder === "hero") return { ...character, equipped: gear, pack };
+  return {
+    ...character,
+    pack,
+    companionGear: { ...(character.companionGear ?? {}), [holder]: gear },
+  };
+}
+
+/**
+ * Put on what the pack holds. Requires a pack copy of `itemId` — one copy
+ * outfits one slot — consumes it, and returns the previous occupant of the
+ * slot to the pack (a swap). A two-handed weapon displaces the off hand
+ * (and vice versa); the displaced copy goes back to the pack too, never to
+ * the void. Stale taps (no copy, illegal slot) return the character
+ * unchanged. `holder` is "hero" or a companion id; every hire draws from the
+ * same pack, so companions can never duplicate an id without buying a copy.
+ */
+export function equip(
+  character: Character,
+  slot: Slot,
+  itemId: string,
+  holder: string = "hero",
+): Character {
+  if (!slotsFor(itemId).includes(slot)) return character;
+  const pack = [...character.pack];
+  const i = pack.indexOf(itemId);
+  if (i === -1) return character;
+  const current = gearOf(character, holder);
+  const prevId = current[slot] ?? null;
+  const beforeMain = current.mainHand ?? null;
+  const beforeOff = current.offHand ?? null;
+  const next = equipSlot(current, slot, itemId);
+  pack.splice(i, 1);
+  if (prevId) pack.push(prevId);
+  // Two-handed clearing vacates the other hand — hand its copy back too
+  // (even when both hands held the same id: those were two copies).
+  if (slot === "mainHand" && beforeOff && !next.offHand) pack.push(beforeOff);
+  if (slot === "offHand" && beforeMain && !next.mainHand) pack.push(beforeMain);
+  return withGear(character, holder, next, pack);
+}
+
+/**
+ * Take it off — the worn copy returns to the pack. An empty slot returns the
+ * character unchanged.
+ */
+export function unequip(
+  character: Character,
+  slot: Slot,
+  holder: string = "hero",
+): Character {
+  const current = gearOf(character, holder);
+  const id = current[slot] ?? null;
+  if (!id) return character;
+  return withGear(character, holder, unequipSlot(current, slot), [...character.pack, id]);
 }

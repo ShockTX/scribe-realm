@@ -28,6 +28,7 @@ import {
   WEAPONS,
   slotsFor,
   isEquippable,
+  allWornIds,
   equip,
   unequip,
   armorClassFrom,
@@ -101,15 +102,19 @@ function Slots({
   );
 }
 
-/** What in the pack could go in the slot you just tapped. */
+/** What in the pack could go in the slot you just tapped. Worn ids are hidden:
+ *  one copy outfits one slot, and anything already worn (by anyone) is not a
+ *  pack copy, so offering it would conjure a duplicate. */
 function Candidates({
   slot,
   pack,
+  worn,
   onEquip,
   onClose,
 }: {
   slot: Slot;
   pack: string[];
+  worn: string[];
   onEquip: (id: string) => void;
   onClose: () => void;
 }) {
@@ -117,6 +122,7 @@ function Candidates({
   const options = pack.filter((id) => {
     if (seen.has(id)) return false;
     seen.add(id);
+    if (worn.includes(id)) return false;
     return slotsFor(id).includes(slot);
   });
   const label = SLOTS.find((s) => s.id === slot)?.label ?? slot;
@@ -175,9 +181,8 @@ function HeroSheet({
   const atk = spellAttackBonus(character);
   const slots = spellSlots(character);
   const due = subclassDue(character);
-
-  const setEquipped = (next: Equipped) =>
-    setCharacter({ ...character, equipped: next });
+  // P8: one copy outfits one slot — equipping consumes from the shared pack.
+  const worn = allWornIds(character);
 
   const counts = new Map<string, number>();
   for (const id of character.pack ?? []) counts.set(id, (counts.get(id) ?? 0) + 1);
@@ -260,14 +265,15 @@ function HeroSheet({
             equipped={equipped}
             active={picking}
             onPick={(s) => setPicking((p) => (p === s ? null : s))}
-            onClear={(s) => setEquipped(unequip(equipped, s))}
+            onClear={(s) => setCharacter(unequip(character, s))}
           />
           {picking && (
             <Candidates
               slot={picking}
               pack={character.pack ?? []}
+              worn={worn}
               onEquip={(id) => {
-                setEquipped(equip(equipped, picking, id));
+                setCharacter(equip(character, picking, id));
                 setPicking(null);
               }}
               onClose={() => setPicking(null)}
@@ -351,12 +357,8 @@ function CompanionSheet({
   const gear = ((character.companionGear ?? {}) as Record<string, Equipped>)[member.key] ?? {};
   const ac = armorClassFrom(gear, 1);
   const note = (character.memberNotes ?? {})[member.key] ?? "";
-
-  const setGear = (next: Equipped) =>
-    setCharacter({
-      ...character,
-      companionGear: { ...(character.companionGear ?? {}), [member.key]: next },
-    });
+  // P8: hires draw from the same pack — worn anywhere means no spare copy.
+  const worn = allWornIds(character);
 
   return (
     <div className="sheet">
@@ -381,14 +383,15 @@ function CompanionSheet({
             equipped={gear}
             active={picking}
             onPick={(s) => setPicking((p) => (p === s ? null : s))}
-            onClear={(s) => setGear(unequip(gear, s))}
+            onClear={(s) => setCharacter(unequip(character, s, member.key))}
           />
           {picking && (
             <Candidates
               slot={picking}
               pack={character.pack ?? []}
+              worn={worn}
               onEquip={(id) => {
-                setGear(equip(gear, picking, id));
+                setCharacter(equip(character, picking, id, member.key));
                 setPicking(null);
               }}
               onClose={() => setPicking(null)}

@@ -262,6 +262,54 @@ export function adjudicate(
   return { roll, branch, text, after: applyConsequence(c, hpMax, con), consequence: con };
 }
 
+/* ------------------------------------------------------------------ *
+ * P7: pending checks settle BEFORE steel and BEFORE boots.            *
+ *                                                                     *
+ * The old SceneView started a fight (or walked rooms) while a pending *
+ * check was still open, then resolved it afterwards with act() —      *
+ * rolling twice for one moment, or dropping the roll entirely. These  *
+ * pure helpers own the ordering rule so the component stays thin and  *
+ * the rule stays tested. adjudicate() is pure (dice aside), so both   *
+ * helpers below are pure too.                                         *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Resolve a pending check before a fight begins. Returns the adjudication
+ * (roll, text, character-after, consequence) when the pending reply asked
+ * for a check, or null when there is nothing to settle. The caller applies
+ * the consequence, records the beat, clears pending, and THEN begins
+ * combat — never the reverse.
+ */
+export function resolvePendingBeforeFight(
+  pending: SceneReply | null,
+  character: Character,
+): { roll?: Roll; branch: "success" | "partial" | "failure"; text: string; after: Character; consequence: Consequence } | null {
+  if (!pending?.check) return null;
+  return adjudicate(character, pending);
+}
+
+/**
+ * Travel must not drop a pending check. Returns true when the pending reply
+ * carries a check that has to be adjudicated (and recorded) before the
+ * party moves rooms; false when travel may proceed as before.
+ */
+export function requirePendingClearBeforeTravel(pending: SceneReply | null): boolean {
+  return !!pending?.check;
+}
+
+/**
+ * The beat a fight is over and written down with. `summary` is
+ * combatSummary(state) — engine provenance, not a player roll — kept as the
+ * action string so the Warden narrates a fact rather than a guess. There is
+ * deliberately NO roll here: the pending check (if any) was settled before
+ * the fight, and the fight's own wounds are already on the character via
+ * applyCombat. Used when the last beat still wants its action, i.e. the
+ * fight began with no pending check to settle first.
+ */
+export function combatBeat(last: Beat, summary: string): Beat {
+  return { ...last, action: summary, result: summary };
+}
+
 /** Compress a beat to one line for the GM's memory. */
 export function beatLine(b: Beat): string {
   const parts = [`#${b.n} in ${b.roomId}`];
