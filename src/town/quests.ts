@@ -41,7 +41,12 @@ export interface QuestSeed {
   leans?: Danger;
 }
 
-/** Where the GM lives. Same origin, so it inherits the site's password. */
+/**
+ * Where the GM lives. Same origin (relative /gm), so it inherits the
+ * site's password. Dev parity requires the same-origin proxy in
+ * vite.config.ts (server.proxy /gm -> GM_TARGET || 127.0.0.1:8710);
+ * never switch these to an absolute backend URL.
+ */
 const GM_QUEST = "/gm/quest";
 const GM_HEALTH = "/gm/health";
 
@@ -170,6 +175,35 @@ export async function gmAwake(): Promise<boolean> {
 /** The coin posted on the bill. Experience is settled by the run, not here. */
 export function completeReward(q: Quest): number {
   return q.reward;
+}
+
+/**
+ * Walk away from taken work. Removes the posting without reward and without
+ * advancing the clock. Only a taken bill can be abandoned; anything else
+ * (or an unknown id) leaves the board untouched. Pure.
+ */
+export function abandonQuest(quests: Quest[], id: string): Quest[] {
+  const target = quests.find((q) => q.id === id);
+  if (!target || target.state !== "taken") return quests;
+  return quests.filter((q) => q.id !== id);
+}
+
+/** Id that does not collide with any posting already on the board. */
+export function uniqueQuestId(baseId: string, existing: Iterable<string>): string {
+  const ids = new Set(existing);
+  if (!ids.has(baseId)) return baseId;
+  let n = 2;
+  while (ids.has(`${baseId}-${n}`)) n += 1;
+  return `${baseId}-${n}`;
+}
+
+/** The quest with an id that does not collide with the board. Pure. */
+export function withUniqueId(q: Quest, existing: Quest[]): Quest {
+  const id = uniqueQuestId(
+    q.id,
+    existing.map((x) => x.id),
+  );
+  return id === q.id ? q : { ...q, id };
 }
 
 export const DANGER_WORD: Record<Danger, string> = {

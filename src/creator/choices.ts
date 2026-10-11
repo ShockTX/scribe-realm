@@ -2,7 +2,7 @@
  * What the rules ALLOW at each step. The UI renders these; it never invents them.
  */
 import type { Character } from "../model/character";
-import { ABILITIES, type Ability } from "../model/character";
+import { ABILITIES, totalLevel, type Ability } from "../model/character";
 import {
   BACKGROUNDS, CLASSES, RACES, backgroundByIndex, classByIndex,
   profRefToSkillIndex, skillByIndex, spellsForClass, type SrdSpell,
@@ -81,7 +81,7 @@ export interface SpellPlan {
 const KNOWN_AT_1: Record<string, number> = {
   bard: 4, sorcerer: 2, warlock: 2, ranger: 0,
 };
-const PREPARED_CLASSES = new Set(["cleric", "druid", "paladin"]);
+const PREPARED_CLASSES = new Set(["cleric", "druid", "paladin", "wizard"]);
 /** A wizard's spellbook starts with six. */
 const WIZARD_SPELLBOOK_AT_1 = 6;
 
@@ -95,6 +95,12 @@ export function spellPlan(c: Character): SpellPlan {
   const idx = first.classIndex;
   const cls = classByIndex.get(idx);
   if (!cls?.spellcasting) return empty;
+
+  // Half-casters (paladin/ranger, spellcasting.level 2) gain no spells at
+  // character level 1: gate on the class's spellcasting level, not the
+  // character's level-1 default.
+  const charLevel = Math.max(1, totalLevel(c));
+  if ((cls.spellcasting.level ?? 1) > charLevel) return empty;
 
   const top = Math.max(1, highestSpellLevel(c));
   const all = spellsForClass(idx, top);
@@ -133,4 +139,28 @@ const START_GOLD: Record<string, number> = {
 
 export function startingGold(classIndex: string | null): number {
   return classIndex ? START_GOLD[classIndex] ?? 50 : 0;
+}
+
+/** True when the six scores use exactly the pool numbers (multiset-equal). */
+export function isPoolSatisfied(pool: number[], scores: Record<Ability, number>): boolean {
+  const a = [...pool].sort((x, y) => x - y);
+  const b = ABILITIES.map((ab) => scores[ab]).sort((x, y) => x - y);
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+/**
+ * True when `value` can go on `ability` without breaking the pool:
+ * the pool multiset minus the other five abilities' values still holds one.
+ */
+export function canAssign(
+  pool: number[], scores: Record<Ability, number>, ability: Ability, value: number,
+): boolean {
+  const counts = new Map<number, number>();
+  for (const v of pool) counts.set(v, (counts.get(v) ?? 0) + 1);
+  for (const a of ABILITIES) {
+    if (a === ability) continue;
+    const v = scores[a];
+    counts.set(v, (counts.get(v) ?? 0) - 1);
+  }
+  return (counts.get(value) ?? 0) > 0;
 }

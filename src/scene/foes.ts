@@ -18,24 +18,38 @@ export interface FoeSpec {
   tier: 1 | 2 | 3;
   undead?: boolean;
   note?: string;
+  /**
+   * Saving-throw bonuses by ability ("dex", "con", ...). SRD-shaped and
+   * deliberately small (+0..+3). Absent abilities default to +1 via
+   * foeSave() — the rank-and-file are neither helpless nor heroes.
+   */
+  saves?: Record<string, number>;
+}
+
+/**
+ * What a foe adds to a saving throw. Falls back to +1 when the statblock
+ * says nothing for that ability, so a missing entry is average, not zero.
+ */
+export function foeSave(spec: Pick<FoeSpec, "saves">, save: string): number {
+  return spec.saves?.[save] ?? 1;
 }
 
 export const FOES: FoeSpec[] = [
-  { id: "rat-swarm", name: "Swarm of rats", ac: 10, hp: 7, attack: "Bites", toHit: 2, damage: "1d6", tier: 1 },
-  { id: "bandit", name: "Bandit", ac: 12, hp: 11, attack: "Scimitar", toHit: 3, damage: "1d6+1", tier: 1 },
-  { id: "goblin", name: "Goblin", ac: 15, hp: 7, attack: "Scimitar", toHit: 4, damage: "1d6+2", tier: 1 },
-  { id: "kobold", name: "Kobold", ac: 12, hp: 5, attack: "Dagger", toHit: 4, damage: "1d4+2", tier: 1 },
-  { id: "giant-rat", name: "Giant rat", ac: 12, hp: 7, attack: "Bite", toHit: 4, damage: "1d4+2", tier: 1 },
-  { id: "skeleton", name: "Skeleton", ac: 13, hp: 13, attack: "Shortsword", toHit: 4, damage: "1d6+2", tier: 1, undead: true },
-  { id: "zombie", name: "Zombie", ac: 8, hp: 22, attack: "Slam", toHit: 3, damage: "1d6+1", tier: 1, undead: true, note: "Slow, and hard to put down." },
-  { id: "stirge", name: "Stirge", ac: 14, hp: 5, attack: "Blood drain", toHit: 5, damage: "1d4+3", tier: 1 },
-  { id: "crystal-crawler", name: "Crystal crawler", ac: 14, hp: 13, attack: "Shard claws", toHit: 4, damage: "1d6+2", tier: 2, note: "Glass grown into a shape that hunts." },
-  { id: "drowned-one", name: "Drowned one", ac: 11, hp: 18, attack: "Cold grip", toHit: 4, damage: "1d8+1", tier: 2, undead: true },
-  { id: "cultist", name: "Cultist", ac: 12, hp: 9, attack: "Sickle", toHit: 3, damage: "1d4+1", tier: 1 },
-  { id: "hobgoblin", name: "Hobgoblin", ac: 18, hp: 11, attack: "Longsword", toHit: 3, damage: "1d8+1", tier: 2 },
-  { id: "ghoul", name: "Ghoul", ac: 12, hp: 22, attack: "Claws", toHit: 4, damage: "2d4+2", tier: 3, undead: true },
-  { id: "wight", name: "Wight", ac: 14, hp: 45, attack: "Longsword", toHit: 4, damage: "1d8+2", tier: 3, undead: true },
-  { id: "bone-guard", name: "Bone guard", ac: 16, hp: 30, attack: "Greataxe", toHit: 5, damage: "1d12+3", tier: 3, undead: true },
+  { id: "rat-swarm", name: "Swarm of rats", ac: 10, hp: 7, attack: "Bites", toHit: 2, damage: "1d6", tier: 1, saves: { dex: 2, con: 1, wis: 0 } },
+  { id: "bandit", name: "Bandit", ac: 12, hp: 11, attack: "Scimitar", toHit: 3, damage: "1d6+1", tier: 1, saves: { dex: 1, con: 1, wis: 0 } },
+  { id: "goblin", name: "Goblin", ac: 15, hp: 7, attack: "Scimitar", toHit: 4, damage: "1d6+2", tier: 1, saves: { dex: 2, con: 0, wis: 0 } },
+  { id: "kobold", name: "Kobold", ac: 12, hp: 5, attack: "Dagger", toHit: 4, damage: "1d4+2", tier: 1, saves: { dex: 2, con: 0, wis: 0 } },
+  { id: "giant-rat", name: "Giant rat", ac: 12, hp: 7, attack: "Bite", toHit: 4, damage: "1d4+2", tier: 1, saves: { dex: 2, con: 1, wis: 0 } },
+  { id: "skeleton", name: "Skeleton", ac: 13, hp: 13, attack: "Shortsword", toHit: 4, damage: "1d6+2", tier: 1, undead: true, saves: { dex: 2, con: 2, wis: 0 } },
+  { id: "zombie", name: "Zombie", ac: 8, hp: 22, attack: "Slam", toHit: 3, damage: "1d6+1", tier: 1, undead: true, note: "Slow, and hard to put down.", saves: { dex: 0, con: 3, wis: 0 } },
+  { id: "stirge", name: "Stirge", ac: 14, hp: 5, attack: "Blood drain", toHit: 5, damage: "1d4+3", tier: 1, saves: { dex: 2, con: 1, wis: 0 } },
+  { id: "crystal-crawler", name: "Crystal crawler", ac: 14, hp: 13, attack: "Shard claws", toHit: 4, damage: "1d6+2", tier: 2, note: "Glass grown into a shape that hunts.", saves: { dex: 1, con: 2, wis: 0 } },
+  { id: "drowned-one", name: "Drowned one", ac: 11, hp: 18, attack: "Cold grip", toHit: 4, damage: "1d8+1", tier: 2, undead: true, saves: { dex: 0, con: 2, wis: 1 } },
+  { id: "cultist", name: "Cultist", ac: 12, hp: 9, attack: "Sickle", toHit: 3, damage: "1d4+1", tier: 1, saves: { dex: 1, con: 0, wis: 1 } },
+  { id: "hobgoblin", name: "Hobgoblin", ac: 18, hp: 11, attack: "Longsword", toHit: 3, damage: "1d8+1", tier: 2, saves: { dex: 1, con: 2, wis: 0 } },
+  { id: "ghoul", name: "Ghoul", ac: 12, hp: 22, attack: "Claws", toHit: 4, damage: "2d4+2", tier: 3, undead: true, saves: { dex: 2, con: 1, wis: 1 } },
+  { id: "wight", name: "Wight", ac: 14, hp: 45, attack: "Longsword", toHit: 4, damage: "1d8+2", tier: 3, undead: true, saves: { dex: 1, con: 2, wis: 2 } },
+  { id: "bone-guard", name: "Bone guard", ac: 16, hp: 30, attack: "Greataxe", toHit: 5, damage: "1d12+3", tier: 3, undead: true, saves: { dex: 1, con: 3, wis: 1 } },
 ];
 
 export function foeById(id: string): FoeSpec | undefined {

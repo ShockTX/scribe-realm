@@ -36,13 +36,27 @@ export function formatModifier(n: number): string {
   return n >= 0 ? `+${n}` : `${n}`;
 }
 
-/** Base scores plus racial bonuses. This is the number on the sheet. */
+/** Base scores plus racial bonuses. This is the number on the sheet.
+ * Fixed `ability_bonuses` apply first; then `ability_bonus_options`
+ * (e.g. half-elf choose-2, +1 each) apply up to `choose` entries from
+ * `c.racialBonusChoices` when they name a valid ability. Invalid or extra
+ * picks are ignored so older saves without the field keep working. */
 export function finalScores(c: Character): AbilityScores {
   const out = { ...c.baseScores };
   const race = c.raceIndex ? raceByIndex.get(c.raceIndex) : undefined;
   for (const b of race?.ability_bonuses ?? []) {
     const key = b.ability_score?.index as Ability | undefined;
     if (key && key in out) out[key] += b.bonus;
+  }
+  const opts = race?.ability_bonus_options;
+  if (opts && opts.choose > 0) {
+    const picks = (c.racialBonusChoices ?? []).slice(0, opts.choose);
+    for (const p of picks) {
+      if (!ABILITIES.includes(p as Ability) || !(p in out)) continue;
+      const key = p as Ability;
+      const opt = opts.from?.options?.find((o) => o.ability_score?.index === key);
+      out[key] += opt?.bonus ?? 1;
+    }
   }
   return out;
 }
@@ -115,14 +129,18 @@ export function passivePerception(c: Character): Derived {
   return withOverride(c, "passivePerception", 10 + modifiers(c).wis + trained);
 }
 
-/** The two saves the first class grants. */
+/** The saves every class grants, unioned and deduped (multiclass-safe). */
 export function savingThrowProficiencies(c: Character): Ability[] {
-  const first = c.classes[0];
-  if (!first) return [];
-  const cls = classByIndex.get(first.classIndex);
-  return (cls?.saving_throws ?? [])
-    .map((r) => r.index as Ability)
-    .filter((a) => ABILITIES.includes(a));
+  if (!c.classes.length) return [];
+  const out: Ability[] = [];
+  for (const entry of c.classes) {
+    const cls = classByIndex.get(entry.classIndex);
+    for (const r of cls?.saving_throws ?? []) {
+      const a = r.index as Ability;
+      if (ABILITIES.includes(a) && !out.includes(a)) out.push(a);
+    }
+  }
+  return out;
 }
 
 export function savingThrow(c: Character, ability: Ability): { bonus: number; proficient: boolean } {
@@ -142,13 +160,15 @@ export function skillBonus(c: Character, skillIndex: string): { bonus: number; p
   return { bonus, proficient };
 }
 
-/** The ability a class casts with, or null if it does not cast. */
+/** The ability a class casts with, or null if it does not cast.
+ * Multiclass: the first class entry with a spellcasting ability wins. */
 export function castingAbility(c: Character): Ability | null {
-  const first = c.classes[0];
-  if (!first) return null;
-  const cls = classByIndex.get(first.classIndex);
-  const idx = cls?.spellcasting?.spellcasting_ability?.index;
-  return idx && ABILITIES.includes(idx as Ability) ? (idx as Ability) : null;
+  for (const entry of c.classes) {
+    const cls = classByIndex.get(entry.classIndex);
+    const idx = cls?.spellcasting?.spellcasting_ability?.index;
+    if (idx && ABILITIES.includes(idx as Ability)) return idx as Ability;
+  }
+  return null;
 }
 
 export function spellSaveDc(c: Character): Derived | null {
@@ -163,18 +183,30 @@ export function spellAttackBonus(c: Character): Derived | null {
   return withOverride(c, "spellAttackBonus", proficiencyBonus(c).value + modifiers(c)[a]);
 }
 
-/** Slots per spell level, from the class's own table. */
+/** Slots per spell level, from the class's own table.
+ * Single class: that class's row. Multiclass: the richest single-class row
+ * among the entries (by total slots, then highest level) — a documented
+ * simplification that avoids an empty sheet without implementing the full
+ * multiclass spellcasting table. */
 export function spellSlots(c: Character): number[] {
-  const first = c.classes[0];
-  if (!first) return [];
-  const row = classLevelRow(first.classIndex, first.level);
-  const sc = row?.spellcasting;
-  if (!sc) return [];
-  const out: number[] = [];
-  for (let lvl = 1; lvl <= 9; lvl++) {
-    out.push(Number(sc[`spell_slots_level_${lvl}`] ?? 0));
+  if (!c.classes.length) return [];
+  const rows = c.classes.map((e) => {
+    const row = classLevelRow(e.classIndex, e.level);
+    const sc = row?.spellcasting;
+    if (!sc) return { total: 0, top: 0, slots: [] as number[] };
+    const slots: number[] = [];
+    for (let lvl = 1; lvl <= 9; lvl++) {
+      slots.push(Number(sc[`spell_slots_level_${lvl}`] ?? 0));
+    }
+    let top = 0;
+    slots.forEach((n, i) => { if (n > 0) top = i + 1; });
+    return { total: slots.reduce((a, b) => a + b, 0), top, slots };
+  });
+  let best = rows[0];
+  for (const r of rows) {
+    if (r.total > best.total || (r.total === best.total && r.top > best.top)) best = r;
   }
-  return out;
+  return best.slots;
 }
 
 export function highestSpellLevel(c: Character): number {
@@ -185,12 +217,15 @@ export function highestSpellLevel(c: Character): number {
 }
 
 export function cantripsKnown(c: Character): number {
-  const first = c.classes[0];
-  if (!first) return 0;
-  const row = classLevelRow(first.classIndex, first.level);
-  return Number(row?.spellcasting?.cantrips_known ?? 0);
+  let best = 0;
+  for (const entry of c.classes) {
+    const row = classLevelRow(entry.classIndex, entry.level);
+    best = Math.max(best, Number(row?.spellcasting?.cantrips_known ?? 0));
+  }
+  return best;
 }
 
+/** First class's die; empty character falls back to d8, never crashes. */
 export function hitDie(c: Character): number {
   const first = c.classes[0];
   return classByIndex.get(first?.classIndex ?? "")?.hit_die ?? 8;

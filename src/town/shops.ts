@@ -26,9 +26,12 @@ export interface ShopItem {
   note: string;
 }
 
-/** Shops buy at half, rounded down, and never for nothing. */
+/** Shops buy at half, rounded down — and a 1gp trinket buys nothing back.
+/// Deliberately NO floor: a 1gp floor meant buying nothing and selling
+/// everything that costs 1gp for 1gp, i.e. a mint for unsellable junk.
+/// Unknown ids are not priced here at all (the counter pays 0 for those). */
 export function sellPrice(price: number): number {
-  return Math.max(1, Math.floor(price / 2));
+  return Math.floor(price / 2);
 }
 
 export const STOCK: Record<string, ShopItem[]> = {
@@ -96,6 +99,7 @@ export const STOCK: Record<string, ShopItem[]> = {
     { id: "waterskin", name: "Waterskin", price: 1, kind: "gear", note: "Fill it before the gate, not after." },
     { id: "lantern", name: "Hooded lantern", price: 5, kind: "gear", note: "Shutter it and you keep your night eyes." },
     { id: "oil-flask", name: "Flask of oil", price: 1, kind: "gear", note: "Burns for six hours, or all at once." },
+    { id: "alchemist-fire", name: "Alchemist's fire", price: 50, kind: "gear", note: "Sticks, and keeps burning. Throw it and stand back." },
     { id: "torches-5", name: "Torches (5)", price: 1, kind: "gear", note: "Pitch-dipped. They gutter in wind." },
     { id: "bedroll", name: "Bedroll", price: 1, kind: "gear", note: "Wool over oilcloth." },
     { id: "tinderbox", name: "Tinderbox", price: 1, kind: "gear", note: "Flint, steel, and a scrap of charcloth." },

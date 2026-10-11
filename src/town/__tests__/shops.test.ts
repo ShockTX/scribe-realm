@@ -30,6 +30,13 @@ describe("shop stock", () => {
   it("prices everything above nothing", () => {
     for (const item of ALL_ITEMS) expect(item.price).toBeGreaterThan(0);
   });
+
+  it("stocks alchemist's fire, so the usable is obtainable", () => {
+    const found = itemById("alchemist-fire");
+    expect(found).toBeDefined();
+    expect(found!.price).toBe(50);
+    expect(stockFor("general-store").some((i) => i.id === "alchemist-fire")).toBe(true);
+  });
 });
 
 describe("selling", () => {
@@ -39,8 +46,12 @@ describe("selling", () => {
     expect(sellPrice(50)).toBe(25);
   });
 
-  it("never pays nothing, even for a 1gp item", () => {
-    expect(sellPrice(1)).toBe(1);
+  it("pays nothing for a 1gp item — no floor, no mint", () => {
+    // P8 anti-mint: the old Math.max(1, …) floor paid 1gp back for every 1gp
+    // item, so junk could be churned forever. Half of 1, rounded down, is 0.
+    expect(sellPrice(1)).toBe(0);
+    expect(sellPrice(0)).toBe(0);
+    expect(sellPrice(3)).toBe(1);
   });
 
   it("can price anything that is buyable", () => {

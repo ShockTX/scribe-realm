@@ -36,7 +36,13 @@ export interface ProficiencyChoice {
 export interface SrdRace {
   index: string; name: string; speed: number;
   ability_bonuses: { ability_score: Ref; bonus: number }[];
-  ability_bonus_options?: { choose: number; from: { options: { ability_score: Ref; bonus: number }[] } };
+  ability_bonus_options?: {
+    choose: number; type?: string;
+    from: {
+      option_set_type?: string;
+      options: { option_type?: string; ability_score: Ref; bonus: number }[];
+    };
+  };
   starting_proficiencies: Ref[];
   starting_proficiency_options?: ProficiencyChoice;
   languages: Ref[];
@@ -73,7 +79,7 @@ export const SPELLS = spellsRaw as unknown as SrdSpell[];
 export const SKILLS = skillsRaw as unknown as SrdSkill[];
 export const LEVELS = levelsRaw as unknown as SrdLevel[];
 export const BACKGROUNDS = backgroundsRaw as unknown as SrdBackground[];
-export const SUBCLASSES = subclassesRaw as unknown as (Ref & { class: Ref })[];
+export const SUBCLASSES = subclassesRaw as unknown as (Ref & { class: Ref; subclass_flavor?: string })[];
 export const ALIGNMENTS = alignmentsRaw as unknown as Ref[];
 export const LANGUAGES = languagesRaw as unknown as Ref[];
 

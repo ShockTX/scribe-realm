@@ -38,8 +38,10 @@ export function levelFromXp(xp: number): number {
   return level;
 }
 
-/** XP required to reach the next level, or null at 20. */
+/** XP required to reach the next level, or null at 20.
+ * Level 0 (no class yet) still needs 300 to reach level 1's successor. */
 export function xpToNext(level: number): number | null {
+  if (level < 1) return XP_THRESHOLDS[1];
   if (level >= XP_THRESHOLDS.length) return null;
   return XP_THRESHOLDS[level];
 }
@@ -60,7 +62,7 @@ export interface SubclassOffer {
 export function subclassOffer(classIndex: string): SubclassOffer | null {
   const options = SUBCLASSES.filter((s) => s.class?.index === classIndex);
   if (!options.length) return null;
-  const flavor = (options[0] as { subclass_flavor?: string }).subclass_flavor || "Specialization";
+  const flavor = options[0].subclass_flavor || "Specialization";
   return {
     flavor,
     options: options.map((s) => ({ index: s.index, name: s.name })),
@@ -84,7 +86,9 @@ export interface LevelNote {
 }
 
 /**
- * Raise the first class until total level matches XP.
+ * Raise the first class until total level matches XP (single-class
+ * advancement: multiclass characters advance classes[0] only, by
+ * (target - now) levels capped at 20 for that entry).
  * Idempotent: a character already at the right level is returned unchanged.
  * Hit points follow the same average the sheet uses for max HP.
  */
@@ -114,12 +118,15 @@ export function applyLevels(c: Character): { character: Character; notes: LevelN
   const drafted = { ...c, classes };
   const afterMax = maxHp(drafted).value;
   const gained = Math.max(0, afterMax - beforeMax);
-  const baseHp = c.currentHp > 0 ? c.currentHp : beforeMax;
+  // An explicit 0 means downed: keep 0, then add only the gained HP
+  // (never a full heal). Absent/NaN falls back to the old max.
+  const baseHp = Number.isFinite(c.currentHp) ? Math.max(0, c.currentHp) : beforeMax;
+  const diceBase = Number.isFinite(c.hitDiceRemaining) ? (c.hitDiceRemaining as number) : 0;
   return {
     character: {
       ...drafted,
       currentHp: Math.min(afterMax, baseHp + gained),
-      hitDiceRemaining: c.hitDiceRemaining + notes.length,
+      hitDiceRemaining: diceBase + notes.length,
     },
     notes,
   };
@@ -128,6 +135,9 @@ export function applyLevels(c: Character): { character: Character; notes: LevelN
 export function chooseSubclass(c: Character, index: string): Character {
   const entry = c.classes[0];
   if (!entry) return c;
+  // Gate on the class's subclass level: no early picks.
+  const at = subclassLevel(entry.classIndex);
+  if (at == null || entry.level < at) return c;
   const offer = subclassOffer(entry.classIndex);
   if (!offer?.options.some((o) => o.index === index)) return c;
   const classes = c.classes.map((e, i) => (i === 0 ? { ...e, subclassIndex: index } : e));

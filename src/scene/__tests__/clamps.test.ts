@@ -9,7 +9,7 @@
  *     fought. Both now read foeCeiling().
  */
 import { describe, it, expect } from "vitest";
-import { readConsequence } from "../dice";
+import { readConsequence, readConsequenceNoCheck } from "../dice";
 import { readScene } from "../run";
 import { foeCeiling } from "../foes";
 import { itemById } from "../../town/shops";
@@ -35,6 +35,25 @@ describe("the Warden may not conjure items", () => {
     const con = readConsequence({ hp: -9999, gp: 9999 }, 1);
     expect(con.hp).toBe(-7);
     expect(con.gp).toBe(100);
+  });
+
+  it("holds unchecked beats to a quarter of the checked caps", () => {
+    const one = readConsequenceNoCheck({ hp: -9999, gp: 9999 }, 1);
+    expect(one.hp).toBe(-3);
+    expect(one.gp).toBe(25);
+    const five = readConsequenceNoCheck({ hp: 9999, gp: 9999 }, 5);
+    expect(five.hp).toBe(7);
+    expect(five.gp).toBe(125);
+  });
+
+  it("lets a free beat carry at most one thing", () => {
+    const con = readConsequenceNoCheck({ gain: ["rope-50", "oil-flask"] }, 3);
+    expect(con.gain).toEqual(["rope-50"]);
+  });
+
+  it("lets alchemist's fire through the gain filter now that a shop sells it", () => {
+    expect(itemById("alchemist-fire")).toBeDefined();
+    expect(readConsequence({ gain: ["alchemist-fire"] }, 1).gain).toEqual(["alchemist-fire"]);
   });
 });
 

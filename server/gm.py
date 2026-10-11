@@ -14,11 +14,12 @@ import json
 import os
 import sys
 import urllib.request
-from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 KEY_PATH = "/etc/scribe-gm/anthropic-key"
 MODEL = "claude-sonnet-4-6"
 API = "https://api.anthropic.com/v1/messages"
+MAX_BODY = 32768
 
 TOWN = """The town: the Hammer & Tide (weaponsmith), the Ninefold Door \
 (arcanist, with a standing blue portal nobody may walk through), Dunmarrow's \
@@ -85,7 +86,7 @@ CHOOSING A CHECK:
 
 CONSEQUENCES (the engine clamps these, so be honest, not cautious):
   {"hp": -4, "gp": 12, "gain": ["torch"], "remember": "one durable fact"}
-  hp negative hurts, positive heals. gp negative spends. Omit what does not change.
+   hp negative hurts, positive heals. gp negative spends. Omit what does not change.
 
 PACING: you are told which beat this is and how many the run has. Build.
 Around the last beat, resolve: set "ending" to "won" (objective achieved),
@@ -106,25 +107,76 @@ Omit "fight" when nobody is fighting. Do not set a fight and an ending together.
 
 Reply with ONLY a JSON object, no prose around it:
 {
- "situation": str,
- "suggestions": [str, str, str],
- "check": {"ability": str, "skill": str, "dc": int, "stakes": str} | omit,
- "onSuccess": {"text": str, "consequence": {...}},
- "onPartial": {"text": str, "consequence": {...}},
- "onFailure": {"text": str, "consequence": {...}},
- "moveTo": str | omit,
- "remember": str | omit,
- "fight": {"name": str, "count": int} | omit,
- "ending": "won"|"cost"|"lost" | omit,
- "epilogue": str | omit
+  "situation": str,
+  "suggestions": [str, str, str],
+  "check": {"ability": str, "skill": str, "dc": int, "stakes": str} | omit,
+  "onSuccess": {"text": str, "consequence": {...}},
+  "onPartial": {"text": str, "consequence": {...}},
+  "onFailure": {"text": str, "consequence": {...}},
+  "moveTo": str | omit,
+  "remember": str | omit,
+  "fight": {"name": str, "count": int} | omit,
+  "ending": "won"|"cost"|"lost" | omit,
+  "epilogue": str | omit
 }
 When you are given a roll, the branch it landed on has ALREADY been chosen by
 the engine - write all three branches anyway; the engine picks the right one.
 """
 
 
+def strip_code_fences(text):
+    """Remove a leading ``` language fence and a trailing ``` fence, safely.
+
+    Never raises IndexError: the split only happens when a newline is
+    present, and the closing fence is only stripped when it is there.
+    """
+    if not isinstance(text, str):
+        return text
+    t = text.strip()
+    if t.startswith("```"):
+        if "\n" in t:
+            t = t.split("\n", 1)[1]
+        else:
+            t = t[3:]
+        if t.rstrip().endswith("```"):
+            t = t.rstrip()
+            t = t[: -len("```")]
+        return t.strip()
+    return t
+
+
+def validate_payload(kind, payload):
+    """Check the minimal shape of a quest/scene payload before any LLM call.
+
+    Returns (ok, error): ok True when the shape is usable, else False with
+    a short human-readable error for the 400 response.
+    """
+    if not isinstance(payload, dict):
+        return (False, "payload must be an object")
+    if kind == "quest":
+        c = payload.get("character", {})
+        if not isinstance(c, dict):
+            return (False, "character must be an object")
+        return (True, "")
+    if kind == "scene":
+        c = payload.get("character", {})
+        if not isinstance(c, dict):
+            return (False, "character must be an object")
+        q = payload.get("quest")
+        if not isinstance(q, dict):
+            return (False, "quest must be an object")
+        s = payload.get("site")
+        if not isinstance(s, dict):
+            return (False, "site must be an object")
+        if not isinstance(s.get("rooms"), list):
+            return (False, "site.rooms must be an array")
+        return (True, "")
+    return (False, "unknown kind")
+
+
 def call_claude(system, prompt, max_tokens=1400):
-    key = open(KEY_PATH).read().strip()
+    with open(KEY_PATH) as f:
+        key = f.read().strip()
     body = json.dumps({
         "model": MODEL,
         "max_tokens": max_tokens,
@@ -140,13 +192,14 @@ def call_claude(system, prompt, max_tokens=1400):
         data = json.load(r)
     text = "".join(b.get("text", "") for b in data.get("content", []))
     text = text.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1].rsplit("```", 1)[0]
+    text = strip_code_fences(text)
     return json.loads(text)
 
 
 def quest_prompt(payload):
     c = payload.get("character", {})
+    if not isinstance(c, dict):
+        c = {}
     taken = payload.get("taken", [])
     p = (
         f"Character: {c.get('name','a stranger')}, level {c.get('level',1)} "
@@ -165,7 +218,7 @@ def quest_prompt(payload):
     if leans in ("low", "fair", "grim"):
         p += f"Work on the board at this stage tends to be: {leans}.\n"
     if taken:
-        p += "Already taken (do not repeat): " + "; ".join(taken) + "\n"
+        p += "Already taken (do not repeat): " + "; ".join(str(t) for t in taken) + "\n"
     if payload.get("memory"):
         facts = [f for f in payload["memory"] if isinstance(f, str)]
         if facts:
@@ -179,18 +232,26 @@ def quest_prompt(payload):
 
 def scene_prompt(payload):
     c = payload.get("character", {})
+    if not isinstance(c, dict):
+        c = {}
     q = payload.get("quest", {})
+    if not isinstance(q, dict):
+        q = {}
     s = payload.get("site", {})
+    if not isinstance(s, dict):
+        s = {}
     rooms = s.get("rooms", [])
+    if not isinstance(rooms, list):
+        rooms = []
     lines = [
         f"THE PLAYER: {c.get('name','someone')}, level {c.get('level',1)} "
         f"{c.get('klass','adventurer')} ({c.get('race','human')}). "
         f"HP {c.get('hp','?')}/{c.get('maxHp','?')}. Purse {c.get('gp',0)} gp.",
     ]
     if c.get("skills"):
-        lines.append("Trained in: " + ", ".join(c["skills"]) + ".")
+        lines.append("Trained in: " + ", ".join(str(x) for x in c["skills"]) + ".")
     if c.get("party"):
-        lines.append("With them: " + ", ".join(c["party"]) + ".")
+        lines.append("With them: " + ", ".join(str(x) for x in c["party"]) + ".")
     lines.append(
         f"Wearing: {c.get('armour') or 'nothing'}. "
         f"Weapon in hand: {c.get('weapon') or 'nothing'}. "
@@ -204,28 +265,37 @@ def scene_prompt(payload):
     if rooms:
         lines.append("Areas here (use these ids for moveTo):")
         for r in rooms:
+            if not isinstance(r, dict):
+                continue
             lines.append(f"  - {r.get('id')}: {r.get('name')} - {r.get('note')}")
     lines.append(f"They are currently in: {payload.get('roomId','?')}")
     lines.append("")
     if payload.get("ledger"):
-        lines.append("WHAT THE WORLD NOW KNOWS:")
-        for f in payload["ledger"]:
-            lines.append(f"  - {f}")
-        lines.append("")
+        ledger = payload["ledger"]
+        if isinstance(ledger, list):
+            lines.append("WHAT THE WORLD NOW KNOWS:")
+            for f in ledger[-20:]:
+                lines.append(f"  - {f}")
+            lines.append("")
     if payload.get("recent"):
-        lines.append("RECENT BEATS:")
-        for b in payload["recent"]:
-            lines.append(f"  {b}")
-        lines.append("")
+        recent = payload["recent"]
+        if isinstance(recent, list):
+            lines.append("RECENT BEATS:")
+            for b in recent[-10:]:
+                lines.append(f"  {b}")
+            lines.append("")
     lines.append(f"This is beat {payload.get('beat',1)} of {payload.get('of',6)}.")
     if payload.get("action"):
         lines.append("")
         lines.append(f"THE PLAYER'S ACTION: {payload['action']}")
-    if payload.get("roll"):
-        r = payload["roll"]
+    roll = payload.get("roll")
+    if isinstance(roll, dict) and roll:
+        r = roll
+        outcome = r.get("outcome")
+        outcome_str = str(outcome).upper() if outcome is not None and outcome != "" else "UNKNOWN"
         lines.append(
             f"THE ENGINE ROLLED: {r.get('label')} - d20 {r.get('die')} "
-            f"= {r.get('total')} against DC {r.get('dc')} -> {r.get('outcome').upper()}. "
+            f"= {r.get('total')} against DC {r.get('dc')} -> {outcome_str}. "
             "This happened. Narrate it."
         )
     if not payload.get("action"):
@@ -266,9 +336,35 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             n = int(self.headers.get("content-length", 0))
-            payload = json.loads(self.rfile.read(n) or b"{}")
+        except (TypeError, ValueError):
+            self._send(400, {"error": "bad content-length"})
+            return
+        if n > MAX_BODY:
+            self._send(413, {"error": "body too large"})
+            return
+        ctype = self.headers.get("content-type", "")
+        if "application/json" not in ctype.lower():
+            self._send(400, {"error": "content-type must be application/json"})
+            return
+        if n == 0:
+            self._send(400, {"error": "empty body"})
+            return
+        try:
+            raw = self.rfile.read(n)
         except Exception as e:
             self._send(400, {"error": f"bad request: {e}"})
+            return
+        if not raw or not raw.strip():
+            self._send(400, {"error": "empty body"})
+            return
+        try:
+            payload = json.loads(raw)
+        except Exception as e:
+            self._send(400, {"error": f"bad request: {e}"})
+            return
+        ok, err = validate_payload(kind, payload)
+        if not ok:
+            self._send(400, {"error": err})
             return
         try:
             if kind == "quest":

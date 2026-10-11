@@ -11,6 +11,7 @@
  * that. The Master proposes, the engine disposes.
  */
 import type { Character } from "../model/character";
+import { rememberFacts } from "../model/memory";
 import type { Danger } from "./quests";
 
 export type StageId = "rumour" | "sign" | "pressure" | "crisis" | "reckoning";
@@ -120,9 +121,59 @@ export function atReckoning(c: Character): boolean {
   return stageOf(c).id === FINAL_STAGE;
 }
 
+export type ReckoningOutcome = "won" | "lost";
+
 /** True when the campaign has been resolved, win or lose. */
+export function isCampaignOver(c: Character): boolean {
+  const v = (c as Character & { campaignOver?: unknown }).campaignOver;
+  if (v !== undefined && v !== null) {
+    if (typeof v === "object") return true;
+    return Boolean(v);
+  }
+  const legacy = (c as Character & { campaignEnd?: unknown }).campaignEnd;
+  if (typeof legacy === "string") return legacy.length > 0;
+  return Boolean(legacy);
+}
+
+/** Legacy name for isCampaignOver; kept so older imports keep working. */
 export function campaignOver(c: Character): boolean {
-  return Boolean((c as Character & { campaignEnd?: string }).campaignEnd);
+  return isCampaignOver(c);
+}
+
+/**
+ * Resolve the campaign at the Reckoning. Marks the character over, appends
+ * a memory fact, and clears any active run. Idempotent: resolving twice
+ * keeps the first outcome.
+ */
+export function resolveReckoning(
+  character: Character,
+  outcome: ReckoningOutcome,
+): Character {
+  if (outcome !== "won" && outcome !== "lost") return character;
+  if (isCampaignOver(character)) return character;
+  const day = Number.isFinite(character.day)
+    ? Math.max(1, Math.floor(character.day))
+    : 1;
+  const withEnd: Character = {
+    ...character,
+    campaignOver: { outcome, day },
+    activeRun: undefined,
+  };
+  const fact =
+    outcome === "won"
+      ? `On day ${day} the Salt Rise broke at the Drowned Crown, and Saltmarrow kept its harbour.`
+      : `On day ${day} the Salt Rise took Saltmarrow, and what was left walked out on the evening tide.`;
+  return rememberFacts(withEnd, [fact]);
+}
+
+/**
+ * Pure gate for the board's posting button. Returns the notice to show when
+ * posting is blocked, or null when posting is allowed.
+ */
+export function postGate(c: Character, openCount: number): string | null {
+  if (isCampaignOver(c)) return "The campaign is over — the board is bare.";
+  if (atReckoning(c) && openCount >= 1) return "The board holds one posting";
+  return null;
 }
 
 /**

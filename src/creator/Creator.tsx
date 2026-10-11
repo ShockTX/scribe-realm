@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ABILITIES, type Ability, type Character, emptyCharacter,
 } from "../model/character";
 import {
   BACKGROUND_OPTIONS, CLASS_OPTIONS, POINT_BUY_BUDGET, RACE_OPTIONS,
-  STANDARD_ARRAY, pointBuyLegal, pointBuySpend, rollAbility, skillChoice,
+  STANDARD_ARRAY, canAssign, isPoolSatisfied, pointBuyLegal, pointBuySpend, rollAbility, skillChoice,
   spellPlan, startingGold,
 } from "./choices";
 import {
@@ -12,7 +12,7 @@ import {
   passivePerception, proficiencyBonus, savingThrow, speed, spellAttackBonus,
   spellSaveDc, spellSlots,
 } from "../rules/derive";
-import { classByIndex, raceByIndex, backgroundByIndex, spellByIndex } from "../rules/srd";
+import { classByIndex, raceByIndex, backgroundByIndex, skillByIndex, spellByIndex } from "../rules/srd";
 
 const ABILITY_NAMES: Record<Ability, string> = {
   str: "Strength", dex: "Dexterity", con: "Constitution",
@@ -61,6 +61,13 @@ export function Creator({ onBind }: { onBind: (c: Character) => void }) {
     : ["name", "race", "class", "background", "abilities", "review"];
   const at = steps.indexOf(step);
 
+  // A class change can strand the wizard on a step that no longer exists
+  // (e.g. "spells" after switching to a non-caster): fall back to the
+  // nearest valid step (abilities, present in both flows).
+  useEffect(() => {
+    if (at === -1) setStep(steps[Math.min(steps.length - 1, 4)] ?? "review");
+  }, [at, steps.length]);
+
   const chosenCantrips = c.spells.known.filter((i) => spellByIndex.get(i)?.level === 0);
   const chosenSpells = c.spells.known.filter((i) => (spellByIndex.get(i)?.level ?? 0) > 0);
 
@@ -71,7 +78,12 @@ export function Creator({ onBind }: { onBind: (c: Character) => void }) {
       case "class": return c.classes.length > 0;
       case "background":
         return !!c.backgroundIndex && c.skillProficiencies.length === skills.choose;
-      case "abilities": return true;
+      case "abilities":
+        if (method === "buy") {
+          return ABILITIES.every((a) => pointBuyLegal(c.baseScores[a]))
+            && pointBuySpend(c.baseScores) <= POINT_BUY_BUDGET;
+        }
+        return isPoolSatisfied(pool, c.baseScores);
       case "spells":
         return chosenCantrips.length === plan.cantrips && chosenSpells.length === plan.spells;
       default: return true;
@@ -104,10 +116,14 @@ export function Creator({ onBind }: { onBind: (c: Character) => void }) {
     });
   };
 
-  const assign = (a: Ability, v: number) =>
+  const assign = (a: Ability, v: number) => {
+    if (method !== "buy" && !canAssign(pool, c.baseScores, a, v)) return;
     setC((prev) => ({ ...prev, baseScores: { ...prev.baseScores, [a]: v } }));
+  };
 
   const bind = () => {
+    // Fresh chronicle: starting gold always applies (a bound character
+    // never carries prior coin into creation). Level-1 hit die floor.
     const gold = startingGold(c.classes[0]?.classIndex ?? null);
     const hp = maxHp(c).value;
     onBind({
@@ -158,7 +174,7 @@ export function Creator({ onBind }: { onBind: (c: Character) => void }) {
               <Choice
                 options={CLASS_OPTIONS}
                 value={c.classes[0]?.classIndex ?? null}
-                onPick={(i) => set({ classes: [{ classIndex: i, level: 1, subclassIndex: null }], spells: { known: [], prepared: [] } })}
+                onPick={(i) => set({ classes: [{ classIndex: i, level: 1, subclassIndex: null }], skillProficiencies: [], spells: { known: [], prepared: [] } })}
               />
             </>
           )}
@@ -368,7 +384,7 @@ export function Creator({ onBind }: { onBind: (c: Character) => void }) {
           )}
           {c.skillProficiencies.length > 0 && (
             <p className="sheet__saves">
-              Skills: {c.skillProficiencies.map((s) => skillChoice(null, null) && s).join(", ")}
+              Skills: {c.skillProficiencies.map((s) => skillByIndex.get(s)?.name ?? s).join(", ")}
             </p>
           )}
         </aside>

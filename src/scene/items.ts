@@ -14,6 +14,8 @@ export interface UsableItem {
   damage?: string;
   /** dex save to avoid, for thrown things */
   save?: "dex" | "con";
+  /** DC for the item's save; defaults to 12 when absent */
+  saveDc?: number;
   /** double damage against undead */
   vsUndead?: boolean;
   /** added to the next weapon hit */

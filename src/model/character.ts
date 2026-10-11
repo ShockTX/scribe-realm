@@ -96,6 +96,10 @@ export interface Character {
   day: number;
   /** runs finished; the second hand of the campaign clock */
   runsDone: number;
+  /** set once at the Reckoning; the campaign is over, win or lose */
+  campaignOver?: { outcome: "won" | "lost"; day: number } | null;
+  /** legacy resolution flag from older saves (truthy string means over) */
+  campaignEnd?: string;
   /** companion ids hired at the Salted Gull */
   companions: string[];
   /** the quest run currently being played, if any */
@@ -111,6 +115,12 @@ export interface Character {
 
   // --- CHOSEN (constrained by the rules) ---
   classes: ClassEntry[];
+  /**
+   * Half-elf (and similar) "choose N abilities for +1" picks.
+   * Applied by finalScores() after fixed ability_bonuses, up to the race's
+   * `choose` count; invalid entries are ignored. Absent on older saves.
+   */
+  racialBonusChoices?: Ability[];
   /** SRD skill indexes, e.g. "arcana". Legality checked against class+background. */
   skillProficiencies: string[];
   expertise: string[];
@@ -155,7 +165,7 @@ export function emptyCharacter(id = crypto.randomUUID()): Character {
     coin: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
     currentHp: 0,
     tempHp: 0,
-    hitDiceRemaining: 0,
+    hitDiceRemaining: 1,
     deathSaveSuccesses: 0,
     deathSaveFailures: 0,
     inspiration: false,

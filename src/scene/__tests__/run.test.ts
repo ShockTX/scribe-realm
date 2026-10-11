@@ -6,10 +6,13 @@ import { SITES } from "../sites";
 import {
   adjudicate,
   askScene,
+  combatBeat,
   dangerBase,
   newRun,
   readScene,
   applySettlement,
+  requirePendingClearBeforeTravel,
+  resolvePendingBeforeFight,
   settleRun,
   type Run,
   type SceneSeed,
@@ -163,6 +166,40 @@ describe("adjudicate", () => {
     expect(out.text).toBe("Jammed.");
     expect(out.consequence.hp).toBe(-2);
   });
+
+  it("re-clamps a hand-built checked consequence that never saw the parser", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    const c = hero();
+    const out = adjudicate(c, {
+      situation: "The vault.",
+      suggestions: [],
+      check: { ability: "dex", dc: 5, stakes: "Riches." },
+      onSuccess: { text: "Rich.", consequence: { hp: -999, gp: 9999 } },
+    });
+    expect(out.branch).toBe("success");
+    expect(out.consequence.hp).toBe(-(4 + 3));
+    expect(out.consequence.gp).toBe(100);
+    expect(out.after.currentHp).toBe(c.currentHp - (4 + 3));
+    expect(out.after.coin.gp).toBe(c.coin.gp + 100);
+  });
+
+  it("holds a no-check beat to the tighter free-narration caps", () => {
+    const c = hero();
+    const out = adjudicate(c, {
+      situation: "The shelf gives.",
+      suggestions: [],
+      onSuccess: {
+        text: "Riches fall on you.",
+        consequence: { hp: -999, gp: 9999, gain: ["rope-50", "oil-flask"] },
+      },
+    });
+    // Level 1: hp capped at 2+1, gp at 25, items at one.
+    expect(out.consequence.hp).toBe(-3);
+    expect(out.consequence.gp).toBe(25);
+    expect(out.consequence.gain).toEqual(["rope-50"]);
+    expect(out.after.currentHp).toBe(c.currentHp - 3);
+    expect(out.after.coin.gp).toBe(c.coin.gp + 25);
+  });
 });
 
 describe("settlement", () => {
@@ -186,6 +223,59 @@ describe("settlement", () => {
   it("still understands the old danger words", () => {
     expect(settleRun(won, 10, "hard", 1).xp).toBe(180);
     expect(settleRun(won, 10, "risky", 1).xp).toBe(150);
+  });
+
+  it("ignores the dead run.loot channel instead of double-paying", () => {
+    const loaded = { ...newRun("q", SITES[0]), ending: "won" as const, loot: ["rope-50"] };
+    const s = settleRun(loaded, 20, "fair", 1);
+    expect(s.loot).toEqual([]);
+    expect(s.lines.join(" ")).not.toContain("carried out");
+  });
+});
+
+describe("P7 pending-before-fight ordering", () => {
+  const pendingCheck = {
+    situation: "Steel.",
+    suggestions: ["Duck"],
+    check: { ability: "dex" as const, dc: 5, stakes: "Your skin." },
+    onSuccess: { text: "Clear.", consequence: { hp: 1 } },
+    onFailure: { text: "Cut.", consequence: { hp: -2 } },
+  };
+  const pendingQuiet = { situation: "Quiet.", suggestions: ["Look"] };
+
+  it("resolvePendingBeforeFight returns null when there is no check to settle", () => {
+    expect(resolvePendingBeforeFight(null, hero())).toBeNull();
+    expect(resolvePendingBeforeFight(pendingQuiet, hero())).toBeNull();
+  });
+
+  it("resolvePendingBeforeFight adjudicates the check (and only the check)", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    const c = hero();
+    c.currentHp -= 3; // room to heal — maxHp clamps, so wound first.
+    const out = resolvePendingBeforeFight(pendingCheck, c);
+    expect(out).not.toBeNull();
+    expect(out!.branch).toBe("success");
+    expect(out!.text).toBe("Clear.");
+    expect(out!.consequence.hp).toBe(1);
+    expect(out!.after.currentHp).toBe(c.currentHp + 1);
+  });
+
+  it("requirePendingClearBeforeTravel blocks travel only while a check is open", () => {
+    expect(requirePendingClearBeforeTravel(null)).toBe(false);
+    expect(requirePendingClearBeforeTravel(pendingQuiet)).toBe(false);
+    expect(requirePendingClearBeforeTravel(pendingCheck)).toBe(true);
+  });
+
+  it("combatBeat keeps the beat and records the engine summary as its action", () => {
+    const last = { n: 2, roomId: "gate", situation: "They rush you." };
+    const done = combatBeat(last, "The fight is over. You killed 1 of them and you are on 8 hit points.");
+    expect(done.n).toBe(2);
+    expect(done.roomId).toBe("gate");
+    expect(done.situation).toBe("They rush you.");
+    // Provenance: the action string comes from combatSummary(), not a roll.
+    expect(done.action).toContain("The fight is over.");
+    expect(done.result).toContain("The fight is over.");
+    expect(done.roll).toBeUndefined();
   });
 });
 
