@@ -41,7 +41,12 @@ export interface QuestSeed {
   leans?: Danger;
 }
 
-/** Where the GM lives. Same origin, so it inherits the site's password. */
+/**
+ * Where the GM lives. Same origin (relative /gm), so it inherits the
+ * site's password. Dev parity requires the same-origin proxy in
+ * vite.config.ts (server.proxy /gm -> GM_TARGET || 127.0.0.1:8710);
+ * never switch these to an absolute backend URL.
+ */
 const GM_QUEST = "/gm/quest";
 const GM_HEALTH = "/gm/health";
 

@@ -30,6 +30,12 @@ import { XP_THRESHOLDS } from "../rules/advance";
 
 export class GmSilent extends Error {}
 
+/**
+ * Where the GM lives. Same origin (relative /gm), so it inherits the
+ * site's password. Dev parity requires the same-origin proxy in
+ * vite.config.ts (server.proxy /gm -> GM_TARGET || 127.0.0.1:8710);
+ * never switch this to an absolute backend URL.
+ */
 const GM_SCENE = "/gm/scene";
 
 /** One exchange, kept for the ledger and the scroll-back. */
