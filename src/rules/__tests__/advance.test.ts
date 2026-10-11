@@ -53,4 +53,42 @@ describe("experience", () => {
     expect(subclassDue(chosen)).toBeNull();
     expect(chooseSubclass(character, "evocation")).toBe(character);
   });
+
+  it("xpToNext(0) asks for 300", () => {
+    expect(xpToNext(0)).toBe(300);
+  });
+
+  it("refuses a subclass before the class grants one", () => {
+    const early = fighter(0);
+    expect(chooseSubclass(early, "champion")).toBe(early);
+  });
+
+  it("levels a downed character from 0 without a full heal", () => {
+    const before = fighter(300);
+    before.currentHp = 0;
+    const { character, notes } = applyLevels(before);
+    expect(notes).toHaveLength(1);
+    expect(character.currentHp).toBe(notes[0].hpGain);
+    expect(character.currentHp).toBeLessThan(maxHp(character).value);
+  });
+
+  it("never produces NaN hit dice when the field is missing", () => {
+    const before = fighter(300);
+    delete (before as unknown as Record<string, unknown>).hitDiceRemaining;
+    const { character } = applyLevels(before);
+    expect(Number.isNaN(character.hitDiceRemaining)).toBe(false);
+    expect(character.hitDiceRemaining).toBe(1);
+  });
+
+  it("advances only the first class for multiclass characters", () => {
+    const c = fighter(900);
+    c.classes = [
+      { classIndex: "fighter", level: 1, subclassIndex: null },
+      { classIndex: "wizard", level: 1, subclassIndex: null },
+    ];
+    // total 2 -> xp 900 wants total 3, so the first class takes the level.
+    const { character } = applyLevels(c);
+    expect(character.classes[0].level).toBe(2);
+    expect(character.classes[1].level).toBe(1);
+  });
 });

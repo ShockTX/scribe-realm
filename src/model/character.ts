@@ -111,6 +111,12 @@ export interface Character {
 
   // --- CHOSEN (constrained by the rules) ---
   classes: ClassEntry[];
+  /**
+   * Half-elf (and similar) "choose N abilities for +1" picks.
+   * Applied by finalScores() after fixed ability_bonuses, up to the race's
+   * `choose` count; invalid entries are ignored. Absent on older saves.
+   */
+  racialBonusChoices?: Ability[];
   /** SRD skill indexes, e.g. "arcana". Legality checked against class+background. */
   skillProficiencies: string[];
   expertise: string[];

@@ -4,7 +4,7 @@
  * storage goes through here first, so a missing field is a default, never a
  * crash.
  */
-import { ABILITIES, DEFAULT_SCORES, emptyCharacter, type Character, type ClassEntry, type OverridableField } from "./character";
+import { ABILITIES, DEFAULT_SCORES, emptyCharacter, type Ability, type Character, type ClassEntry, type OverridableField } from "./character";
 import { maxHp } from "../rules/derive";
 import { MEMORY_CAP } from "./memory";
 
@@ -129,6 +129,11 @@ export function normalize(raw: unknown): Character | null {
     attacks: list(c.attacks),
     classes: normalizeClasses(c.classes),
     skillProficiencies: stringList(c.skillProficiencies),
+    racialBonusChoices: Array.isArray((c as { racialBonusChoices?: unknown }).racialBonusChoices)
+      ? ((c as { racialBonusChoices?: unknown }).racialBonusChoices as unknown[]).filter(
+          (x): x is Ability => typeof x === "string" && (ABILITIES as readonly string[]).includes(x),
+        )
+      : undefined,
     expertise: stringList(c.expertise),
     toolProficiencies: stringList(c.toolProficiencies),
     languageIndexes: stringList(c.languageIndexes),
