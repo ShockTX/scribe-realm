@@ -4,14 +4,98 @@
  * storage goes through here first, so a missing field is a default, never a
  * crash.
  */
-import { DEFAULT_SCORES, emptyCharacter, type Character } from "./character";
+import { ABILITIES, DEFAULT_SCORES, emptyCharacter, type Character, type ClassEntry, type OverridableField } from "./character";
 import { maxHp } from "../rules/derive";
+import { MEMORY_CAP } from "./memory";
 
 function num(v: unknown, fallback: number): number {
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
 function list<T>(v: unknown): T[] {
   return Array.isArray(v) ? (v as T[]) : [];
+}
+function stringList(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+}
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function normalizeBaseScores(raw: unknown): Character["baseScores"] {
+  const out = { ...DEFAULT_SCORES };
+  const src: Record<string, unknown> = isPlainObject(raw) ? raw : {};
+  for (const a of ABILITIES) {
+    const v = src[a];
+    if (typeof v !== "number" || !Number.isFinite(v)) {
+      out[a] = 10;
+    } else {
+      out[a] = Math.min(30, Math.max(1, Math.round(v)));
+    }
+  }
+  return out;
+}
+
+function normalizeXp(raw: unknown): number {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return 0;
+  return Math.max(0, Math.floor(raw));
+}
+
+function normalizeClasses(raw: unknown): ClassEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ClassEntry[] = [];
+  for (const e of raw) {
+    if (!isPlainObject(e)) continue;
+    const rec = e as Record<string, unknown>;
+    if (typeof rec.classIndex !== "string" || !rec.classIndex.trim()) continue;
+    const lvlRaw = rec.level;
+    const level =
+      typeof lvlRaw === "number" && Number.isFinite(lvlRaw)
+        ? Math.min(20, Math.max(1, Math.round(lvlRaw)))
+        : 1;
+    const subRaw = rec.subclassIndex;
+    const subclassIndex = typeof subRaw === "string" ? subRaw : null;
+    out.push({ classIndex: rec.classIndex, level, subclassIndex });
+  }
+  return out;
+}
+
+const OVERRIDABLE_FIELDS: ReadonlySet<OverridableField> = new Set<OverridableField>([
+  "maxHp",
+  "armorClass",
+  "speed",
+  "initiative",
+  "proficiencyBonus",
+  "passivePerception",
+  "spellSaveDc",
+  "spellAttackBonus",
+]);
+
+function normalizeOverrides(raw: unknown): Character["overrides"] {
+  if (!isPlainObject(raw)) return {};
+  const out: Character["overrides"] = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (!OVERRIDABLE_FIELDS.has(k as OverridableField)) continue;
+    if (!isPlainObject(v)) continue;
+    const rec = v as Record<string, unknown>;
+    if (typeof rec.value !== "number" || !Number.isFinite(rec.value)) continue;
+    if (typeof rec.note !== "string") continue;
+    out[k as OverridableField] = { value: rec.value, note: rec.note };
+  }
+  return out;
+}
+
+function normalizeActiveRun(raw: unknown): unknown {
+  if (raw === undefined || raw === null) return undefined;
+  if (!isPlainObject(raw)) return undefined;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.questId !== "string" || typeof r.siteId !== "string" || typeof r.roomId !== "string") {
+    return undefined;
+  }
+  if (!Array.isArray(r.beats) || !Array.isArray(r.ledger)) return undefined;
+  if (typeof r.length !== "number" || !Number.isFinite(r.length)) return undefined;
+  const e = r.ending;
+  if (!(e === null || e === "won" || e === "cost" || e === "lost")) return undefined;
+  return raw;
 }
 
 export function normalize(raw: unknown): Character | null {
@@ -27,38 +111,39 @@ export function normalize(raw: unknown): Character | null {
     ...c,
     version: 2,
     name: c.name,
-    baseScores: { ...DEFAULT_SCORES, ...(c.baseScores ?? {}) },
-    coin: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0, ...(c.coin ?? {}) },
-    pack: list<string>(c.pack),
-    companions: list<string>(c.companions),
-    xp: typeof (c as { xp?: unknown }).xp === "number" ? (c as { xp: number }).xp : 0,
+    baseScores: normalizeBaseScores(c.baseScores),
+    coin: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0, ...(isPlainObject(c.coin) ? c.coin : {}) },
+    pack: stringList(c.pack),
+    companions: stringList(c.companions),
+    xp: normalizeXp((c as { xp?: unknown }).xp),
     memory: list<unknown>(c.memory)
       .filter((x): x is string => typeof x === "string")
       .map((s) => s.trim())
       .filter(Boolean)
-      .slice(-24),
+      .slice(-MEMORY_CAP),
     quests: list(c.quests),
-    activeRun: (c as { activeRun?: unknown }).activeRun ?? undefined,
-    equipped: (c.equipped && typeof c.equipped === "object" ? c.equipped : {}) as Character["equipped"],
-    companionGear: (c.companionGear && typeof c.companionGear === "object" ? c.companionGear : {}) as Character["companionGear"],
-    memberNotes: (c.memberNotes && typeof c.memberNotes === "object" ? c.memberNotes : {}) as Character["memberNotes"],
+    activeRun: normalizeActiveRun((c as { activeRun?: unknown }).activeRun),
+    equipped: (isPlainObject(c.equipped) ? c.equipped : {}) as Character["equipped"],
+    companionGear: (isPlainObject(c.companionGear) ? c.companionGear : {}) as Character["companionGear"],
+    memberNotes: (isPlainObject(c.memberNotes) ? c.memberNotes : {}) as Character["memberNotes"],
     attacks: list(c.attacks),
-    classes: list(c.classes),
-    skillProficiencies: list<string>(c.skillProficiencies),
-    expertise: list<string>(c.expertise),
-    toolProficiencies: list<string>(c.toolProficiencies),
-    languageIndexes: list<string>(c.languageIndexes),
+    classes: normalizeClasses(c.classes),
+    skillProficiencies: stringList(c.skillProficiencies),
+    expertise: stringList(c.expertise),
+    toolProficiencies: stringList(c.toolProficiencies),
+    languageIndexes: stringList(c.languageIndexes),
     spells: {
-      known: list<string>(c.spells?.known),
-      prepared: list<string>(c.spells?.prepared),
+      known: list<string>((c.spells as { known?: unknown } | undefined)?.known),
+      prepared: list<string>((c.spells as { prepared?: unknown } | undefined)?.prepared),
     },
-    overrides: (c.overrides ?? {}) as Character["overrides"],
-    day: Math.max(1, num(c.day, 1)),
+    overrides: normalizeOverrides(c.overrides),
+    day: Math.max(1, Math.floor(num(c.day, 1))),
     currentHp: num(c.currentHp, 0),
-    tempHp: num(c.tempHp, 0),
-    hitDiceRemaining: num(c.hitDiceRemaining, 1),
-    deathSaveSuccesses: num(c.deathSaveSuccesses, 0),
-    deathSaveFailures: num(c.deathSaveFailures, 0),
+    tempHp: Math.max(0, num(c.tempHp, 0)),
+    hitDiceRemaining: Math.max(0, Math.floor(num(c.hitDiceRemaining, 1))),
+    deathSaveSuccesses: Math.min(3, Math.max(0, Math.floor(num(c.deathSaveSuccesses, 0)))),
+    deathSaveFailures: Math.min(3, Math.max(0, Math.floor(num(c.deathSaveFailures, 0)))),
+    runsDone: Math.max(0, Math.floor(num((c as { runsDone?: unknown }).runsDone, 0))),
     inspiration: c.inspiration === true,
   } as Character;
 

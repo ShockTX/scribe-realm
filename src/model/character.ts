@@ -155,7 +155,7 @@ export function emptyCharacter(id = crypto.randomUUID()): Character {
     coin: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
     currentHp: 0,
     tempHp: 0,
-    hitDiceRemaining: 0,
+    hitDiceRemaining: 1,
     deathSaveSuccesses: 0,
     deathSaveFailures: 0,
     inspiration: false,
