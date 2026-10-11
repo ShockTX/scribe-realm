@@ -6,7 +6,16 @@
  */
 import { describe, it, expect } from "vitest";
 import { emptyCharacter, type Character } from "../../model/character";
-import { STAGES, stageOf, atReckoning, townLine } from "../campaign";
+import {
+  STAGES,
+  stageOf,
+  atReckoning,
+  campaignOver,
+  isCampaignOver,
+  postGate,
+  resolveReckoning,
+  townLine,
+} from "../campaign";
 import { settleRun, dangerShare, type Run } from "../../scene/run";
 import { XP_THRESHOLDS, levelFromXp } from "../../rules/advance";
 import { LOCATIONS } from "../locations";
@@ -83,6 +92,74 @@ describe("the town notices", () => {
     for (const loc of ["guildhall", "harbormaster", "temple", "tavern", "wharf-market", "weaponsmith"]) {
       expect(ids.has(loc)).toBe(true);
     }
+  });
+});
+
+describe("the Reckoning resolves", () => {
+  it("is not over before it is resolved", () => {
+    expect(isCampaignOver(at(30))).toBe(false);
+    expect(campaignOver(at(30))).toBe(false);
+  });
+
+  it("a won reckoning marks the day, clears the run, and remembers", () => {
+    const c = {
+      ...at(30),
+      activeRun: { questId: "q" },
+      memory: ["The shelf fell."],
+    } as Character;
+    const done = resolveReckoning(c, "won");
+    expect(done.campaignOver).toEqual({ outcome: "won", day: 30 });
+    expect(isCampaignOver(done)).toBe(true);
+    expect(campaignOver(done)).toBe(true);
+    expect(done.activeRun).toBeUndefined();
+    expect(done.memory.length).toBeGreaterThan(c.memory.length);
+    expect(done.memory.join(" ")).toMatch(/Salt Rise/);
+  });
+
+  it("a lost reckoning marks the loss without advancing anything else", () => {
+    const done = resolveReckoning(at(31, 18), "lost");
+    expect(done.campaignOver).toEqual({ outcome: "lost", day: 31 });
+    expect(done.day).toBe(31);
+    expect(done.runsDone).toBe(18);
+  });
+
+  it("resolving twice keeps the first outcome", () => {
+    const once = resolveReckoning(at(30), "won");
+    expect(resolveReckoning(once, "lost")).toBe(once);
+    expect(once.campaignOver?.outcome).toBe("won");
+  });
+
+  it("the world stays at the reckoning once it is over", () => {
+    const done = resolveReckoning(at(30), "won");
+    expect(stageOf(done).id).toBe("reckoning");
+  });
+
+  it("honours a legacy campaignEnd flag from older saves", () => {
+    const old = { ...at(30), campaignEnd: "won" } as Character;
+    expect(isCampaignOver(old)).toBe(true);
+    expect(resolveReckoning(old, "lost")).toBe(old);
+  });
+});
+
+describe("the board gate", () => {
+  it("allows posting before the Reckoning", () => {
+    expect(postGate(at(1), 0)).toBeNull();
+    expect(postGate(at(1), 4)).toBeNull();
+  });
+
+  it("allows the first posting at the Reckoning", () => {
+    expect(postGate(at(30), 0)).toBeNull();
+  });
+
+  it("holds to one open posting at the Reckoning", () => {
+    expect(postGate(at(30), 1)).toBe("The board holds one posting");
+    expect(postGate(at(1, 18), 2)).toBe("The board holds one posting");
+  });
+
+  it("bars every posting once the campaign is over", () => {
+    const done = resolveReckoning(at(30), "won");
+    expect(postGate(done, 0)).toBeTruthy();
+    expect(postGate(done, 1)).toBeTruthy();
   });
 });
 

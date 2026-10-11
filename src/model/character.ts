@@ -96,6 +96,10 @@ export interface Character {
   day: number;
   /** runs finished; the second hand of the campaign clock */
   runsDone: number;
+  /** set once at the Reckoning; the campaign is over, win or lose */
+  campaignOver?: { outcome: "won" | "lost"; day: number } | null;
+  /** legacy resolution flag from older saves (truthy string means over) */
+  campaignEnd?: string;
   /** companion ids hired at the Salted Gull */
   companions: string[];
   /** the quest run currently being played, if any */

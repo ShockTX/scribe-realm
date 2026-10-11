@@ -164,4 +164,14 @@ describe("save validation", () => {
     // absent field falls back to the same default as normalize
     expect(normalize({ name: "H" })!.hitDiceRemaining).toBe(1);
   });
+
+  it("keeps a well-shaped campaign resolution and drops a bogus one", () => {
+    expect(
+      normalize({ name: "I", campaignOver: { outcome: "won", day: 30 } })!.campaignOver,
+    ).toEqual({ outcome: "won", day: 30 });
+    expect(
+      normalize({ name: "I", campaignOver: { outcome: "maybe", day: 30 } })!.campaignOver,
+    ).toBeUndefined();
+    expect(normalize({ name: "I" })!.campaignOver).toBeUndefined();
+  });
 });

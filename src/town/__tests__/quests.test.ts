@@ -1,5 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { readQuest, GmSilent, completeReward, DANGER_WORD, rewardFor } from "../quests";
+import {
+  readQuest,
+  abandonQuest,
+  uniqueQuestId,
+  withUniqueId,
+  GmSilent,
+  completeReward,
+  DANGER_WORD,
+  rewardFor,
+  type Quest,
+} from "../quests";
 
 const good = {
   title: "The Bell That Rings Itself",
@@ -56,5 +66,61 @@ describe("reading what the GM sends back", () => {
       expect(DANGER_WORD[d]).toBeTruthy();
       expect(DANGER_WORD[d]).not.toMatch(/[0-9]/);
     }
+  });
+});
+
+function bill(over: Partial<Quest> = {}): Quest {
+  return {
+    id: "bell-d1",
+    title: "The Bell",
+    giver: "Enna",
+    where: "the Shrine",
+    hook: "hook",
+    detail: "detail",
+    reward: 240,
+    danger: "fair",
+    posted: 1,
+    state: "taken",
+    ...over,
+  };
+}
+
+describe("walking away from work", () => {
+  it("removes a taken bill and keeps the rest", () => {
+    const board = [bill(), bill({ id: "rats-d1", state: "offered" })];
+    const next = abandonQuest(board, "bell-d1");
+    expect(next.map((q) => q.id)).toEqual(["rats-d1"]);
+    expect(board).toHaveLength(2);
+  });
+
+  it("ignores an unknown id", () => {
+    const board = [bill()];
+    expect(abandonQuest(board, "nope-d9")).toBe(board);
+  });
+
+  it("refuses to abandon work that was never taken", () => {
+    const board = [bill({ state: "offered" }), bill({ id: "old-d1", state: "done" })];
+    expect(abandonQuest(board, "bell-d1")).toBe(board);
+    expect(abandonQuest(board, "old-d1")).toBe(board);
+  });
+});
+
+describe("posting ids never collide", () => {
+  it("keeps a fresh id untouched", () => {
+    expect(uniqueQuestId("bell-d1", [])).toBe("bell-d1");
+    expect(uniqueQuestId("bell-d1", ["rats-d1"])).toBe("bell-d1");
+  });
+
+  it("appends -2, -3 until the id is free", () => {
+    expect(uniqueQuestId("bell-d1", ["bell-d1"])).toBe("bell-d1-2");
+    expect(uniqueQuestId("bell-d1", ["bell-d1", "bell-d1-2"])).toBe("bell-d1-3");
+  });
+
+  it("withUniqueId renames only on collision", () => {
+    const q = bill();
+    expect(withUniqueId(q, [])).toBe(q);
+    const renamed = withUniqueId(q, [bill()]);
+    expect(renamed.id).toBe("bell-d1-2");
+    expect(renamed.title).toBe(q.title);
   });
 });

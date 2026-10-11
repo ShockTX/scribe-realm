@@ -6,6 +6,8 @@ import type { Character } from "../model/character";
 import { totalLevel } from "../model/character";
 import {
   askForQuest,
+  abandonQuest,
+  withUniqueId,
   DANGER_WORD,
   GmSilent,
   type QuestSeed,
@@ -13,7 +15,7 @@ import {
 import { rumourOfTheDay } from "./inn";
 import { newRun } from "../scene/run";
 import { siteForQuest } from "../scene/sites";
-import { stageOf } from "./campaign";
+import { postGate, stageOf } from "./campaign";
 import { postedLine } from "./locations";
 
 function seedFrom(c: Character): QuestSeed {
@@ -71,6 +73,13 @@ export function Board({
 
   async function post() {
     if (busy) return;
+    // The Reckoning narrows the board to one posting; a resolved campaign
+    // closes it. Pure gate so the rule is testable without the GM.
+    const gate = postGate(character, open.length);
+    if (gate) {
+      setTrouble(gate);
+      return;
+    }
     setBusy(true);
     setTrouble(null);
     try {
@@ -82,7 +91,12 @@ export function Board({
       );
       // P8: functional update — the fetch above can outlive re-renders, so
       // appending to the closed-over quests array could drop newer bills.
-      setCharacter((prev) => ({ ...prev, quests: [...(prev.quests ?? []), q] }));
+      // P9: slug collisions (same title, same day) get a -2/-3 suffix so a
+      // posting never overwrites another.
+      setCharacter((prev) => {
+        const existing = prev.quests ?? [];
+        return { ...prev, quests: [...existing, withUniqueId(q, existing)] };
+      });
       say(postedLine(placeId, q.title));
     } catch (e) {
       setTrouble(
@@ -102,6 +116,22 @@ export function Board({
     }));
     const q = quests.find((x) => x.id === id);
     if (q) say(`You take down the bill for ${q.title}. It is yours now.`);
+  }
+
+  /** Walk away from taken work: no reward, no clock, run cleared if open. */
+  function abandon(id: string) {
+    if (busy) return;
+    const q = quests.find((x) => x.id === id);
+    if (!q || q.state !== "taken") return;
+    setCharacter((prev) => {
+      const next = abandonQuest(prev.quests ?? [], id);
+      if (next === prev.quests) return prev;
+      const run = prev.activeRun as { questId?: string } | undefined;
+      const activeRun =
+        run && typeof run === "object" && run.questId === id ? undefined : prev.activeRun;
+      return { ...prev, quests: next, activeRun };
+    });
+    say(`You leave the bill for ${q.title} where it lies. Someone else can have it.`);
   }
 
   function venture(id: string) {
@@ -152,9 +182,14 @@ export function Board({
                 Take it down
               </button>
             ) : (
-              <button className="ware__buy" onClick={() => venture(q.id)} disabled={busy}>
-                Venture out
-              </button>
+              <span className="quest__acts">
+                <button className="ware__buy" onClick={() => venture(q.id)} disabled={busy}>
+                  Venture out
+                </button>
+                <button className="link" onClick={() => abandon(q.id)} disabled={busy}>
+                  Abandon
+                </button>
+              </span>
             )}
           </li>
         ))}

@@ -84,6 +84,17 @@ function normalizeOverrides(raw: unknown): Character["overrides"] {
   return out;
 }
 
+function normalizeCampaignOver(raw: unknown): Character["campaignOver"] {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const r = raw as Record<string, unknown>;
+  if (r.outcome !== "won" && r.outcome !== "lost") return undefined;
+  const d = r.day;
+  const day =
+    typeof d === "number" && Number.isFinite(d) ? Math.max(1, Math.floor(d)) : 1;
+  return { outcome: r.outcome, day };
+}
+
 function normalizeActiveRun(raw: unknown): unknown {
   if (raw === undefined || raw === null) return undefined;
   if (!isPlainObject(raw)) return undefined;
@@ -149,6 +160,12 @@ export function normalize(raw: unknown): Character | null {
     deathSaveSuccesses: Math.min(3, Math.max(0, Math.floor(num(c.deathSaveSuccesses, 0)))),
     deathSaveFailures: Math.min(3, Math.max(0, Math.floor(num(c.deathSaveFailures, 0)))),
     runsDone: Math.max(0, Math.floor(num((c as { runsDone?: unknown }).runsDone, 0))),
+    campaignOver: normalizeCampaignOver((c as { campaignOver?: unknown }).campaignOver),
+    campaignEnd:
+      typeof (c as { campaignEnd?: unknown }).campaignEnd === "string" &&
+      ((c as { campaignEnd?: unknown }).campaignEnd as string)
+        ? ((c as { campaignEnd?: unknown }).campaignEnd as string)
+        : undefined,
     inspiration: c.inspiration === true,
   } as Character;
 

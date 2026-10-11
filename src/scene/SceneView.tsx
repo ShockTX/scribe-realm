@@ -9,8 +9,6 @@ import { useEffect, useRef, useState } from "react";
 import type { Character } from "../model/character";
 import { totalLevel } from "../model/character";
 import { worldLedger, rememberFacts } from "../model/memory";
-import { type LevelNote } from "../rules/advance";
-import { LevelRise } from "../game/LevelRise";
 import { maxHp, hpOf } from "../rules/derive";
 import { heroArmorClass } from "../game/party";
 import { COMPANIONS } from "../town/inn";
@@ -128,7 +126,6 @@ export function SceneView({
   const [typed, setTyped] = useState("");
   const [fight, setFight] = useState<CombatState | null>(null);
   const [paid, setPaid] = useState<Settlement | null>(null);
-  const [rise, setRise] = useState<LevelNote[]>([]);
   const opened = useRef(false);
   const foughtBeat = useRef<number | null>(null);
   // Settlement: the only place a finished run pays out. `run.payout` keeps
@@ -142,7 +139,6 @@ export function SceneView({
       return result.character;
     });
     if (settlement) setPaid(settlement);
-    setRise([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run.ending]);
 
@@ -566,15 +562,6 @@ export function SceneView({
             <p className="beat__trouble">
               {trouble}. <button className="link" onClick={() => void open()}>Try again</button>
             </p>
-          )}
-
-          {run.ending && (
-            <LevelRise
-              notes={rise}
-              character={character}
-              setCharacter={setCharacter}
-              onDismiss={() => setRise([])}
-            />
           )}
 
           {run.ending && (

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { totalLevel, type Character } from "../model/character";
 import { maxHp, hpOf } from "../rules/derive";
 import {
@@ -10,7 +10,7 @@ import {
   type TownLocation,
   type ServiceKind,
 } from "./locations";
-import { townLine, stageOf } from "./campaign";
+import { atReckoning, isCampaignOver, resolveReckoning, townLine, stageOf } from "./campaign";
 import { stockFor, itemById, sellPrice, identifyPack, type ShopItem } from "./shops";
 import { Board } from "./Board";
 import { SceneView } from "../scene/SceneView";
@@ -530,16 +530,10 @@ export function TownView({
     onChange?.(c);
   };
 
-  // A save can hold XP from before levels existed. Catch it up in town,
-  // never mid-run — the scene announces a level earned at the table.
-  useEffect(() => {
-    if (local.activeRun) return;
-    const risen = applyLevels(local);
-    if (!risen.notes.length) return;
-    update(risen.character);
-    setRise(risen.notes);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [local.xp, local.activeRun]);
+  // P10: levels are earned by XP but TAKEN at the trainer, for coin.
+  // There is deliberately no auto-apply here — an old save with banked XP
+  // shows "Level earned — train" until Interior.train() applies it.
+  // (A previous mount effect called applyLevels(local) for free; removed.)
 
   const hp = hpOf(local);
 
@@ -567,6 +561,37 @@ export function TownView({
 
   return (
     <>
+      {atReckoning(local) && !isCampaignOver(local) && !run && (
+        <div className="reckoning" role="status">
+          <p>
+            <strong>The Reckoning is here.</strong> The sea stands where the
+            market was, and there is one thing left to do. Name how it ends.
+          </p>
+          <div className="reckoning__acts">
+            <button
+              className="ware__buy"
+              onClick={() => update(resolveReckoning(localRef.current, "won"))}
+            >
+              We broke the Rise
+            </button>
+            <button
+              className="link"
+              onClick={() => update(resolveReckoning(localRef.current, "lost"))}
+            >
+              We lost Saltmarrow
+            </button>
+          </div>
+        </div>
+      )}
+      {isCampaignOver(local) && (
+        <div className="reckoning reckoning--over" role="status">
+          <p>
+            {local.campaignOver?.outcome === "won"
+              ? `The Salt Rise broke on day ${local.campaignOver?.day}, and Saltmarrow kept its harbour.`
+              : `The Salt Rise took Saltmarrow on day ${local.campaignOver?.day ?? local.day}. What was left walked out on the evening tide.`}
+          </p>
+        </div>
+      )}
       <div className="purse">
         <button className="purse__who" onClick={() => setSheet((v) => !v)}>
           {local.name}
