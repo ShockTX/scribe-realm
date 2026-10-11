@@ -158,7 +158,15 @@ export function applyConsequence(
   };
 }
 
-/** Clamp whatever the model returned into a sane consequence. */
+/** Clamp whatever the model returned into a sane consequence.
+ *
+ * Caps for a CHECKED beat (the GM asked for a roll and the engine made it):
+ * - hp: +/-(4 + 3 per level) — a single beat can never gut a character.
+ * - gp: +/-100 per level — about two-fifths of a fair job, so a beat can
+ *   pay for gear but never for a house.
+ * - gain: at most 3 items, and only catalogue ids (see the gain filter).
+ * - remember: one trimmed line, 200 chars.
+ */
 export function readConsequence(raw: unknown, level: number): Consequence {
   if (!raw || typeof raw !== "object") return {};
   const r = raw as Record<string, unknown>;
@@ -185,6 +193,32 @@ export function readConsequence(raw: unknown, level: number): Consequence {
   }
   if (typeof r.remember === "string" && r.remember.trim()) {
     out.remember = r.remember.trim().slice(0, 200);
+  }
+  return out;
+}
+
+/**
+ * Clamp a NO-CHECK beat (the GM asked for no roll; the action "simply
+ * happens"). Free narration must not be a farm: unchecked beats pay at most
+ * a quarter of the checked caps — gp capped at 25 per level, hp at
+ * (2 + level), and a single item. Anything worth more than that is, by
+ * definition, worth asking for a check.
+ */
+export function readConsequenceNoCheck(raw: unknown, level: number): Consequence {
+  const con = readConsequence(raw, level);
+  const out: Consequence = { ...con };
+  const goldCap = 25 * level;
+  if (typeof out.gp === "number") {
+    out.gp = Math.max(-goldCap, Math.min(goldCap, out.gp));
+  }
+  const hpCap = 2 + level;
+  if (typeof out.hp === "number") {
+    out.hp = Math.max(-hpCap, Math.min(hpCap, out.hp));
+  }
+  // readConsequence already allows 3; a free beat carries at most one thing.
+  if (out.gain) {
+    out.gain = out.gain.slice(0, 1);
+    if (!out.gain.length) delete out.gain;
   }
   return out;
 }

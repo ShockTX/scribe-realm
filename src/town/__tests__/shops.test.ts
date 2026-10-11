@@ -30,6 +30,13 @@ describe("shop stock", () => {
   it("prices everything above nothing", () => {
     for (const item of ALL_ITEMS) expect(item.price).toBeGreaterThan(0);
   });
+
+  it("stocks alchemist's fire, so the usable is obtainable", () => {
+    const found = itemById("alchemist-fire");
+    expect(found).toBeDefined();
+    expect(found!.price).toBe(50);
+    expect(stockFor("general-store").some((i) => i.id === "alchemist-fire")).toBe(true);
+  });
 });
 
 describe("selling", () => {

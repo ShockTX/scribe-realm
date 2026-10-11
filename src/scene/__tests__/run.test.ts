@@ -163,6 +163,40 @@ describe("adjudicate", () => {
     expect(out.text).toBe("Jammed.");
     expect(out.consequence.hp).toBe(-2);
   });
+
+  it("re-clamps a hand-built checked consequence that never saw the parser", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    const c = hero();
+    const out = adjudicate(c, {
+      situation: "The vault.",
+      suggestions: [],
+      check: { ability: "dex", dc: 5, stakes: "Riches." },
+      onSuccess: { text: "Rich.", consequence: { hp: -999, gp: 9999 } },
+    });
+    expect(out.branch).toBe("success");
+    expect(out.consequence.hp).toBe(-(4 + 3));
+    expect(out.consequence.gp).toBe(100);
+    expect(out.after.currentHp).toBe(c.currentHp - (4 + 3));
+    expect(out.after.coin.gp).toBe(c.coin.gp + 100);
+  });
+
+  it("holds a no-check beat to the tighter free-narration caps", () => {
+    const c = hero();
+    const out = adjudicate(c, {
+      situation: "The shelf gives.",
+      suggestions: [],
+      onSuccess: {
+        text: "Riches fall on you.",
+        consequence: { hp: -999, gp: 9999, gain: ["rope-50", "oil-flask"] },
+      },
+    });
+    // Level 1: hp capped at 2+1, gp at 25, items at one.
+    expect(out.consequence.hp).toBe(-3);
+    expect(out.consequence.gp).toBe(25);
+    expect(out.consequence.gain).toEqual(["rope-50"]);
+    expect(out.after.currentHp).toBe(c.currentHp - 3);
+    expect(out.after.coin.gp).toBe(c.coin.gp + 25);
+  });
 });
 
 describe("settlement", () => {
@@ -186,6 +220,13 @@ describe("settlement", () => {
   it("still understands the old danger words", () => {
     expect(settleRun(won, 10, "hard", 1).xp).toBe(180);
     expect(settleRun(won, 10, "risky", 1).xp).toBe(150);
+  });
+
+  it("ignores the dead run.loot channel instead of double-paying", () => {
+    const loaded = { ...newRun("q", SITES[0]), ending: "won" as const, loot: ["rope-50"] };
+    const s = settleRun(loaded, 20, "fair", 1);
+    expect(s.loot).toEqual([]);
+    expect(s.lines.join(" ")).not.toContain("carried out");
   });
 });
 

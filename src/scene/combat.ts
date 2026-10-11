@@ -32,7 +32,7 @@ import {
   type WeaponSpec,
 } from "../game/gear";
 import { armourHinders, attackDie, d20, roll } from "./dice";
-import { matchFoe, tierCap, foeCeiling, type FoeSpec } from "./foes";
+import { foeSave, matchFoe, tierCap, foeCeiling, type FoeSpec } from "./foes";
 import { spellEffect, type SpellEffect } from "./spells";
 import { usable } from "./items";
 
@@ -46,6 +46,8 @@ export interface Combatant {
   damage: string;
   attack: string;
   undead: boolean;
+  /** saving-throw bonuses copied from the statblock; foeSave() defaults gaps to +1 */
+  saves?: Record<string, number>;
   initiative: number;
   down: boolean;
 }
@@ -126,6 +128,7 @@ function foeToCombatant(spec: FoeSpec, n: number): Combatant {
     damage: spec.damage,
     attack: spec.attack,
     undead: !!spec.undead,
+    saves: spec.saves ? { ...spec.saves } : undefined,
     initiative: d20() + 1,
     down: false,
   };
@@ -337,8 +340,16 @@ export function playerTurn(
       return s;
     }
   } else if (option.kind === "defend") {
-    s.wardAc = Math.max(s.wardAc, 2);
-    s.wardRounds = 1;
+    // Guarding is a +2 ward for one round — but it never tears down a
+    // stronger or longer ward already in place (e.g. Shield of Faith).
+    // A weaker ward yields; an equal or stronger one keeps its rounds.
+    const newAc = Math.max(s.wardAc, 2);
+    if (newAc > s.wardAc || s.wardRounds <= 0) {
+      s.wardAc = newAc;
+      s.wardRounds = 1;
+    } else if (newAc === s.wardAc) {
+      s.wardRounds = Math.max(s.wardRounds, 1);
+    }
     s.log.push({ round: s.round, who: "you", text: "You set your feet and cover up." });
   } else if (option.kind === "attack" && target) {
     const equipped = (c.equipped ?? {}) as Equipped;
@@ -398,6 +409,10 @@ export function playerTurn(
       });
     };
 
+    // Ranged weapons always roll at disadvantage: there is no range tracking
+    // in this engine, so every shot is treated as fired with a foe in reach.
+    // That is deliberate, not a missing feature — bows stay usable, and they
+    // stay honest about the press of bodies around the archer.
     swing(
       w?.spec ?? null,
       !!(w && bothHandsFree(equipped) && !w.spec.ranged),
@@ -417,8 +432,17 @@ export function playerTurn(
         s.hpNow = Math.min(hpMax, s.hpNow + healed);
         s.log.push({ round: s.round, who: "you", text: `${e.name}. ${e.blurb} You recover ${healed}.`, damage: -healed });
       } else if (e.shape === "buff") {
-        s.wardAc = Math.max(s.wardAc, e.acBonus ?? 1);
-        s.wardRounds = e.rounds ?? 3;
+        // Same rule as guarding: a weaker blessing does not shorten a
+        // stronger ward. A winning bonus replaces; an equal one keeps the
+        // longer of the two durations.
+        const bonus = e.acBonus ?? 1;
+        const rounds = e.rounds ?? 3;
+        if (bonus > s.wardAc || s.wardRounds <= 0) {
+          s.wardAc = bonus;
+          s.wardRounds = rounds;
+        } else if (bonus === s.wardAc) {
+          s.wardRounds = Math.max(s.wardRounds, rounds);
+        }
         s.log.push({ round: s.round, who: "you", text: `${e.name}. ${e.blurb}` });
       } else if (e.shape === "save" && target) {
         const dc = spellSaveDc(c)?.value ?? 10 + prof;
@@ -426,7 +450,8 @@ export function playerTurn(
         const base = rollDice(e.dice ?? "1d6");
         for (const v of victims) {
           const die = d20();
-          const saved = die + 1 >= dc;
+          const foeBonus = foeSave(v, e.save ?? "dex");
+          const saved = die + foeBonus >= dc;
           const dmg = saved ? (e.halfOnSave ? Math.floor(base / 2) : 0) : base;
           if (dmg > 0) damageFoe(s, v, dmg);
           s.log.push({
@@ -434,7 +459,7 @@ export function playerTurn(
             who: "you",
             text: `${e.name} catches the ${v.name.toLowerCase()} — it ${saved ? "rides most of it out" : "takes it full"}${v.down ? " and drops" : ""}.`,
             die,
-            total: die + 1,
+            total: die + foeBonus,
             against: dc,
             hit: !saved,
             damage: dmg || undefined,
@@ -480,10 +505,14 @@ export function playerTurn(
         s.coating = u.weaponBonus;
         s.log.push({ round: s.round, who: "you", text: `${u.verb}. Your next hit carries it.` });
       } else if (u.damage && target) {
-        const dc = 12;
+        const dc = u.saveDc ?? 12;
         const die = d20();
-        const saved = die + 1 >= dc;
-        let dmg = saved ? Math.floor(rollDice(u.damage) / 2) : rollDice(u.damage);
+        const foeBonus = foeSave(target, u.save ?? "dex");
+        const saved = die + foeBonus >= dc;
+        // One shared roll: a save halves the same fire, it does not summon
+        // a second flask.
+        const rolled = rollDice(u.damage);
+        let dmg = saved ? Math.floor(rolled / 2) : rolled;
         if (u.vsUndead && target.undead) dmg *= 2;
         if (dmg > 0) damageFoe(s, target, dmg);
         s.log.push({
@@ -491,7 +520,7 @@ export function playerTurn(
           who: "you",
           text: `${u.verb}. It bursts over the ${target.name.toLowerCase()}${target.down ? ", and it falls" : ""}.`,
           die,
-          total: die + 1,
+          total: die + foeBonus,
           against: dc,
           hit: !saved,
           damage: dmg,

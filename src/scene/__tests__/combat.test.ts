@@ -1,7 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { emptyCharacter } from "../../model/character";
 import { maxHp } from "../../rules/derive";
 import { beginCombat, optionsFor, playerAc, playerTurn } from "../combat";
+import { foeSave } from "../foes";
+import { itemById } from "../../town/shops";
 
 function hero() {
   const c = emptyCharacter();
@@ -129,4 +131,125 @@ describe("the weapon in hand", () => {
     expect(swings[1]?.damage).toBe(1);
     expect(after.coating).toBe("1d4");
   });
+});
+
+describe("wards do not tear each other down", () => {
+  it("keeps a stronger, longer ward when you guard", () => {
+    const c = hero();
+    const s0 = beginCombat(c, "bandit", 1);
+    s0.hpNow = 999;
+    s0.wardAc = 3;
+    s0.wardRounds = 8;
+    const defend = optionsFor(c, s0).find((o) => o.kind === "defend")!;
+    const after = playerTurn(c, s0, defend);
+    // 8 rounds kept, minus the one the foe's turn ticks away.
+    expect(after.wardAc).toBe(3);
+    expect(after.wardRounds).toBe(7);
+  });
+
+  it("refreshes guard when no ward is up", () => {
+    const c = hero();
+    const s0 = beginCombat(c, "bandit", 1);
+    const defend = optionsFor(c, s0).find((o) => o.kind === "defend")!;
+    const spy = vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const after = playerTurn(c, s0, defend);
+    spy.mockRestore();
+    // Ward was 2 for the foe's turn, then expired as designed.
+    expect(after.wardAc).toBe(0);
+    expect(after.wardRounds).toBe(0);
+    expect(after.log.some((l) => l.text.includes("set your feet"))).toBe(true);
+  });
+
+  it("does not let a weaker blessing shorten a stronger ward", () => {
+    const c = hero();
+    const s0 = beginCombat(c, "bandit", 1);
+    s0.hpNow = 999;
+    s0.wardAc = 2;
+    s0.wardRounds = 8;
+    const after = playerTurn(c, s0, { kind: "spell", id: "bless", label: "x", detail: "x" });
+    expect(after.wardAc).toBe(2);
+    expect(after.wardRounds).toBe(7);
+  });
+
+  it("keeps the longer duration when the bonus ties", () => {
+    const c = hero();
+    const s0 = beginCombat(c, "bandit", 1);
+    s0.hpNow = 999;
+    s0.wardAc = 2;
+    s0.wardRounds = 8;
+    const after = playerTurn(c, s0, { kind: "spell", id: "shield-of-faith", label: "x", detail: "x" });
+    expect(after.wardAc).toBe(2);
+    expect(after.wardRounds).toBe(7);
+  });
+
+  it("lets a stronger blessing replace a weaker ward", () => {
+    const c = hero();
+    const s0 = beginCombat(c, "bandit", 1);
+    s0.hpNow = 999;
+    s0.wardAc = 2;
+    s0.wardRounds = 1;
+    const after = playerTurn(c, s0, { kind: "spell", id: "mage-armor", label: "x", detail: "x" });
+    expect(after.wardAc).toBe(3);
+    expect(after.wardRounds).toBe(7);
+  });
+});
+
+describe("foe saving throws", () => {
+  it("defaults a missing entry to +1", () => {
+    expect(foeSave({}, "dex")).toBe(1);
+    expect(foeSave({ saves: { dex: 2 } }, "dex")).toBe(2);
+    expect(foeSave({ saves: { dex: 2 } }, "wis")).toBe(1);
+  });
+
+  it("rolls the zombie's bad dex, not a flat +1", () => {
+    // Fighter: no casting ability, so DC 12. Fixed dice: d8 damage 5, d20 11.
+    const c = hero();
+    const s0 = beginCombat(c, "zombie", 1);
+    const spy = vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const after = playerTurn(c, s0, { kind: "spell", id: "sacred-flame", label: "x", detail: "x" });
+    spy.mockRestore();
+    const line = after.log.find((l) => l.who === "you" && l.die != null)!;
+    expect(line.total).toBe(11); // 11 + zombie dex 0; the old flat +1 read 12
+    expect(line.against).toBe(12);
+    expect(line.hit).toBe(true);
+    expect(line.damage).toBe(5);
+  });
+
+  it("rolls the goblin's good dex", () => {
+    const c = hero();
+    const s0 = beginCombat(c, "goblin", 1);
+    const spy = vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const after = playerTurn(c, s0, { kind: "spell", id: "sacred-flame", label: "x", detail: "x" });
+    spy.mockRestore();
+    const line = after.log.find((l) => l.who === "you" && l.die != null)!;
+    expect(line.total).toBe(13); // 11 + goblin dex 2
+    expect(line.hit).toBe(false);
+    expect(line.damage).toBeUndefined();
+  });
+});
+
+describe("thrown things", () => {
+  it("halves the same roll on a save instead of rolling twice", () => {
+    const c = hero();
+    c.pack = ["oil-flask"];
+    const s0 = beginCombat(c, "bandit", 1);
+    // d20 1 (fail vs DC 12), first damage roll 1+1=2, then a second roll
+    // of 6+6 the old code would have used instead.
+    const queue = [0, 0, 0, 0.99, 0.99];
+    const spy = vi.spyOn(Math, "random").mockImplementation(() => queue.shift() ?? 0.5);
+    const after = playerTurn(c, s0, { kind: "item", id: "oil-flask", label: "x", detail: "x" });
+    spy.mockRestore();
+    const line = after.log.find((l) => l.who === "you" && l.die != null)!;
+    expect(line.hit).toBe(true);
+    expect(line.damage).toBe(2);
+  });
+
+  it("alchemist's fire is a real catalogue item you can buy", () => {
+    expect(itemById("alchemist-fire")).toBeDefined();
+    expect(itemById("alchemist-fire")!.price).toBe(50);
+  });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });

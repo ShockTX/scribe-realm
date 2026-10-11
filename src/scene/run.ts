@@ -19,6 +19,7 @@ import {
   applyConsequence,
   branchOf,
   readConsequence,
+  readConsequenceNoCheck,
   resolve,
   type CheckRequest,
   type Consequence,
@@ -61,7 +62,10 @@ export interface Run {
   epilogue?: string;
   /** paid on a won or cost ending */
   payout?: number;
-  /** shop item ids carried out of the site */
+  /**
+   * @deprecated Dead channel, kept for saved-game compat. Nothing populates
+   * it and settleRun ignores it; loot travels via the character's pack only.
+   */
   loot?: string[];
 }
 
@@ -234,9 +238,11 @@ export function adjudicate(
   const hpMax = maxHp(c).value;
 
   if (!reply.check) {
-    // No roll asked for: the action simply happens.
+    // No roll asked for: the action simply happens — but under the tighter
+    // no-check caps, so free narration cannot farm gold or healing. The
+    // re-clamp also covers hand-built replies that never passed readScene.
     const b = reply.onSuccess ?? { text: reply.situation, consequence: {} };
-    const con = b.consequence ?? {};
+    const con = readConsequenceNoCheck(b.consequence ?? {}, level);
     return { branch: "success", text: b.text, after: applyConsequence(c, hpMax, con), consequence: con };
   }
 
@@ -249,8 +255,10 @@ export function adjudicate(
         ? (reply.onPartial ?? reply.onFailure)
         : (reply.onFailure ?? reply.onPartial);
   const text = chosen?.text ?? "It goes as it goes.";
-  const con = chosen?.consequence ?? {};
-  void level;
+  // Re-clamp even for parsed replies: adjudicate is the ONLY path by which
+  // a run changes a character, so the caps are enforced here, not trusted
+  // to the parser having seen the data first.
+  const con = readConsequence(chosen?.consequence ?? {}, level);
   return { roll, branch, text, after: applyConsequence(c, hpMax, con), consequence: con };
 }
 
@@ -329,7 +337,11 @@ export function settleRun(
   // At 20 there is no gap left; fall back to the last real gap so work still pays.
   const gap = next == null ? (XP_THRESHOLDS[19] - XP_THRESHOLDS[18]) : next - here;
   const xp = Math.max(10, Math.round(gap * dangerShare(danger) * share));
-  const loot = run.loot ?? [];
+  // run.loot is a dead channel: nothing ever populates it (adjudicate pays
+  // items straight into the pack via applyConsequence), and honouring it
+  // here would double-pay anything a caller stuffed in by hand. Loot travels
+  // via the pack only. The field stays on Run for saved-game compat.
+  const loot: string[] = [];
   const lines = [
     `${gold} gp` + (run.ending === "cost" ? " — half, for half a job" : ""),
     `${xp} xp`,
